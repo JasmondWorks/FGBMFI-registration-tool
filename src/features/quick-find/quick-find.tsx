@@ -70,7 +70,8 @@ export function QuickFind() {
       <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>
         <CommandInput value={q} onValueChange={onQuery} placeholder="Name, chapter, district, registration ID or filename" />
         <CommandList>
-          {q.trim() && !loading && <CommandEmpty>No badges match &ldquo;{q}&rdquo;.</CommandEmpty>}
+          {loading && results.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted-foreground">Searching…</p>}
+          {q.trim() && !loading && results.length === 0 && <CommandEmpty>No badges match &ldquo;{q}&rdquo;.</CommandEmpty>}
           {results.length > 0 && (
             <CommandGroup heading="Badges">
               {results.map((c) => (
