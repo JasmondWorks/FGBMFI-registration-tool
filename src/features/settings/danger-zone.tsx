@@ -16,17 +16,21 @@ const PHRASE = "DELETE EVERYTHING";
 export function DangerZone() {
   const { requireOperator } = useOperator();
   const [text, setText] = React.useState("");
+  const [pin, setPin] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [open, setOpen] = React.useState(false);
 
+  const canSubmit = text === PHRASE && pin.length > 0;
+
   async function reset() {
-    if (!requireOperator() || text !== PHRASE) return;
+    if (!requireOperator() || !canSubmit) return;
     setBusy(true);
     try {
-      await api("/api/admin/reset", { method: "POST", json: { confirm: text } });
+      await api("/api/admin/reset", { method: "POST", json: { confirm: text, pin } });
       emitDeskChanged();
       toast.success("Everything's cleared. Starting fresh.");
       setText("");
+      setPin("");
       setOpen(false);
     } catch (err) {
       toast.error(errorMessage(err));
@@ -56,11 +60,23 @@ export function DangerZone() {
             </Label>
             <Input id="reset-confirm" value={text} onChange={(e) => setText(e.target.value)} autoComplete="off" className="max-w-sm" />
           </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="reset-pin">Reset PIN</Label>
+            <Input
+              id="reset-pin"
+              type="password"
+              inputMode="numeric"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              autoComplete="off"
+              className="max-w-sm"
+            />
+          </div>
           <div className="flex gap-2">
-            <Button variant="destructive" disabled={text !== PHRASE || busy} onClick={reset}>
+            <Button variant="destructive" disabled={!canSubmit || busy} onClick={reset}>
               {busy ? "Clearing..." : "Clear everything"}
             </Button>
-            <Button variant="ghost" onClick={() => (setOpen(false), setText(""))}>
+            <Button variant="ghost" onClick={() => (setOpen(false), setText(""), setPin(""))}>
               Cancel
             </Button>
           </div>
