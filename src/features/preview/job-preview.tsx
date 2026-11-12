@@ -51,19 +51,24 @@ export function JobPreview() {
     setFix(null);
   }
 
+  const pages = job?.pages ?? [];
+  const readyPages = pages.filter((p) => p.status === "READY");
+  // A page short of 4 that isn't an explicit, logged "print anyway" override is never
+  // printable — regardless of upload, reprint, or queue-built job — so this has to block
+  // the print action itself, not just surface as a server error after the click.
+  const hasIncompletePage = readyPages.some((p) => p.items.length !== 4 && !p.isUnderfilled);
+  const blocked = (job?.unplaced.length ?? 0) > 0 || hasIncompletePage;
+
   // "Fix the count" opens by itself when a job has badges left over, until dismissed.
-  const autoFix = !!job && job.unplaced.length > 0 && fixDismissedFor !== job.id && intake.state.phase === "idle";
+  const autoFix = !!job && blocked && fixDismissedFor !== job.id && intake.state.phase === "idle";
   const fixState = fix ?? (autoFix ? { base: {} } : null);
 
-  const pages = job?.pages ?? [];
   const visiblePages = pages.filter((p) =>
     filter === "all" ? true : filter === "ready" ? p.status === "READY" : filter === "waiting" ? p.status === "SENT" || p.status === "SPOOLED" : ["CONFIRMED", "PARTIAL", "CANCELLED"].includes(p.status),
   );
   const selected = pages.find((p) => p.id === selectedId) ?? visiblePages[0] ?? pages[0] ?? null;
-  const readyPages = pages.filter((p) => p.status === "READY");
   const waitingPages = pages.filter((p) => p.status === "SENT" || p.status === "SPOOLED");
   const badgeCount = pages.reduce((n, p) => n + p.items.length, 0);
-  const blocked = (job?.unplaced.length ?? 0) > 0;
   const printing = phase.kind !== "idle";
 
   const index = selected ? pages.findIndex((p) => p.id === selected.id) : -1;
@@ -270,11 +275,17 @@ export function JobPreview() {
                   </div>
                   <div className="flex w-full max-w-[560px] flex-wrap items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">
-                      {settings.printMode === "DIRECT"
-                        ? `Prints directly to ${settings.printerName ?? "the chosen printer"} at actual size.`
-                        : "In the print dialog choose A4 and Actual size (100%). Never Fit to page."}
+                      {selected.status === "READY" && selected.items.length !== 4 && !selected.isUnderfilled
+                        ? `${selected.items.length} of 4 slots filled — printing is blocked until this sheet is complete.`
+                        : settings.printMode === "DIRECT"
+                          ? `Prints directly to ${settings.printerName ?? "the chosen printer"} at actual size.`
+                          : "In the print dialog choose A4 and Actual size (100%). Never Fit to page."}
                     </p>
-                    {selected.status === "READY" ? (
+                    {selected.status === "READY" && selected.items.length !== 4 && !selected.isUnderfilled ? (
+                      <Button variant="outline" onClick={() => setFix({ base: {} })}>
+                        Fix this sheet to print it
+                      </Button>
+                    ) : selected.status === "READY" ? (
                       <Button variant="outline" onClick={() => printPages([selected.id])} disabled={printing}>
                         Print this sheet
                       </Button>

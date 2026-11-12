@@ -16,7 +16,7 @@ import { useIntakeContext } from "@/features/intake/intake-provider";
 
 export type LayoutBase = { removeCardIds?: string[]; holdCardIds?: string[]; addCardIds?: string[] };
 
-type Choice = "hold" | "remove" | "add" | "tray" | "underfill";
+type Choice = "hold" | "remove" | "add" | "queue" | "underfill";
 
 /**
  * Every sheet holds 4 badges, so the total must be a multiple of 4 to avoid wasting
@@ -49,10 +49,12 @@ export function CountFixDialog({
   ].filter((c) => !removed.has(c.id));
   const count = checkCount(queue.length);
 
-  const tray = useFetch(open ? "tray" : null, () => api<CardSummary[]>("/api/tray"));
-  const trayAvailable = (tray.data ?? []).filter((t) => !queue.some((q) => q.id === t.id));
+  // The whole queue, not just the (now largely vestigial) waiting tray subset — any badge
+  // uploaded anywhere that hasn't printed yet can fill the gap on this sheet.
+  const queueFetch = useFetch(open ? "queue-available" : null, () => api<{ rows: CardSummary[] }>("/api/queue?size=200"));
+  const queueAvailable = (queueFetch.data?.rows ?? []).filter((t) => !queue.some((q) => q.id === t.id));
 
-  const defaultChoice: Choice = isUpload ? "hold" : trayAvailable.length >= count.missing ? "tray" : "remove";
+  const defaultChoice: Choice = isUpload ? "hold" : queueAvailable.length >= count.missing ? "queue" : "remove";
   const [choice, setChoice] = React.useState<Choice>(defaultChoice);
   const [picked, setPicked] = React.useState<Set<string>>(new Set());
   const [ack, setAck] = React.useState(false);
@@ -100,7 +102,7 @@ export function CountFixDialog({
   function apply() {
     if (choice === "hold") return layout({ holdCardIds: [...picked] });
     if (choice === "remove") return layout({ removeCardIds: [...picked] });
-    if (choice === "tray") return layout({ addCardIds: trayAvailable.slice(0, count.missing).map((t) => t.id) });
+    if (choice === "queue") return layout({ addCardIds: queueAvailable.slice(0, count.missing).map((t) => t.id) });
     if (choice === "underfill") return layout({ allowUnderfilled: true });
     if (choice === "add") fileInput.current?.click();
   }
@@ -114,15 +116,15 @@ export function CountFixDialog({
     },
     {
       id: "add",
-      title: `Add ${count.missing} more ${count.missing === 1 ? "file" : "files"}`,
+      title: `Upload ${count.missing} more ${count.missing === 1 ? "file" : "files"} from this device`,
       detail: "Pick more badge files to complete the last sheet.",
       show: isUpload && !base.removeCardIds?.length,
     },
     {
-      id: "tray",
-      title: `Fill the gap from the waiting tray`,
-      detail: `${pluralize(Math.min(trayAvailable.length, count.missing), "waiting badge")} will join this ${isUpload ? "upload" : "reprint"}.`,
-      show: trayAvailable.length >= count.missing && count.missing > 0,
+      id: "queue",
+      title: `Add ${pluralize(count.missing, "badge")} from the queue`,
+      detail: `${pluralize(Math.min(queueAvailable.length, count.missing), "badge")} already waiting elsewhere will join this ${isUpload ? "upload" : "reprint"}.`,
+      show: queueAvailable.length >= count.missing && count.missing > 0,
     },
     {
       id: "remove",
