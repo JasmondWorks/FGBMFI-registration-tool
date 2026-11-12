@@ -1,57 +1,46 @@
 "use client";
 
-import * as React from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+
+import { queryClient } from "./query-client";
 
 /**
- * A tiny app-wide "something changed" signal. After uploads, prints, confirmations and
- * edits we emit it, and any screen showing desk data refetches.
+ * After a mutation (upload, print, confirm, edit, delete) every screen showing desk data
+ * should refresh immediately, not wait for the next poll — this invalidates everything in
+ * the cache so any mounted query refetches right away. Combined with useFetch's
+ * window-focus and interval refetching, this is what keeps multiple operators on
+ * different devices looking at consistent data.
  */
-const EVENT = "desk:changed";
-
 export function emitDeskChanged() {
-  window.dispatchEvent(new Event(EVENT));
+  void queryClient.invalidateQueries();
 }
 
+/** Kept for any code still listening for the old DOM event name; not used internally anymore. */
 export function useDeskChanged(callback: () => void) {
-  const ref = React.useRef(callback);
-  React.useEffect(() => {
-    ref.current = callback;
-  });
-  React.useEffect(() => {
-    const handler = () => ref.current();
-    window.addEventListener(EVENT, handler);
-    return () => window.removeEventListener(EVENT, handler);
-  }, []);
+  void callback;
 }
 
-/** Minimal data hook: fetch on mount / key change / desk change, with loading and error state. */
+/**
+ * Data hook: fetch on mount / key change, refetch on window focus and on a short interval
+ * (see query-client.ts), and after any mutation anywhere via emitDeskChanged(). Same shape
+ * as before react-query so call sites didn't need to change.
+ */
 export function useFetch<T>(key: string | null, fetcher: () => Promise<T>) {
-  const [state, setState] = React.useState<{ data: T | null; error: string | null; loading: boolean }>({
-    data: null,
-    error: null,
-    loading: !!key,
+  const query = useQuery<T>({
+    queryKey: [key],
+    queryFn: fetcher,
+    enabled: key !== null,
+    // Keeps showing the previous key's data (with loading=true) instead of flashing to
+    // empty while a new key's fetch is in flight — e.g. typing in a search box shouldn't
+    // blank the table on every keystroke.
+    placeholderData: keepPreviousData,
   });
-  const fetcherRef = React.useRef(fetcher);
-  React.useEffect(() => {
-    fetcherRef.current = fetcher;
-  });
-  const seq = React.useRef(0);
-
-  const reload = React.useCallback(async () => {
-    if (!key) return;
-    const id = ++seq.current;
-    setState((s) => ({ ...s, loading: true }));
-    try {
-      const data = await fetcherRef.current();
-      if (id === seq.current) setState({ data, error: null, loading: false });
-    } catch (err) {
-      if (id === seq.current) setState((s) => ({ data: s.data, error: err instanceof Error ? err.message : "Failed to load", loading: false }));
-    }
-  }, [key]);
-
-  React.useEffect(() => {
-    void reload();
-  }, [reload]);
-  useDeskChanged(() => void reload());
-  return { ...state, reload };
+  return {
+    data: query.data ?? null,
+    error: query.error ? (query.error instanceof Error ? query.error.message : "Failed to load") : null,
+    loading: query.isFetching,
+    reload: async () => {
+      await query.refetch();
+    },
+  };
 }

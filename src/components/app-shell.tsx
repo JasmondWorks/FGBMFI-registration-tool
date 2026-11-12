@@ -3,11 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { QueryClientProvider } from "@tanstack/react-query";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Toaster, TooltipProvider } from "@/components/ui/misc";
 import { MenuIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { queryClient } from "@/lib/query-client";
 import { IntakeProvider } from "@/features/intake/intake-provider";
 import { OperatorProvider } from "@/features/operator/operator-context";
 import { OperatorPicker } from "@/features/operator/operator-picker";
@@ -29,24 +31,26 @@ const NAV = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <OperatorProvider>
-      <TooltipProvider>
-        <PrintProvider>
-          <React.Suspense>
-            <IntakeProvider>
-              <div className="flex min-h-dvh flex-col">
-                <TopBar />
-                <main className="flex-1">{children}</main>
-              </div>
-              <BadgeViewer />
-              <PageViewer />
-              <JobPreview />
-            </IntakeProvider>
-          </React.Suspense>
-        </PrintProvider>
-        <Toaster />
-      </TooltipProvider>
-    </OperatorProvider>
+    <QueryClientProvider client={queryClient}>
+      <OperatorProvider>
+        <TooltipProvider>
+          <PrintProvider>
+            <React.Suspense>
+              <IntakeProvider>
+                <div className="flex min-h-dvh flex-col">
+                  <TopBar />
+                  <main className="flex-1">{children}</main>
+                </div>
+                <BadgeViewer />
+                <PageViewer />
+                <JobPreview />
+              </IntakeProvider>
+            </React.Suspense>
+          </PrintProvider>
+          <Toaster />
+        </TooltipProvider>
+      </OperatorProvider>
+    </QueryClientProvider>
   );
 }
 
