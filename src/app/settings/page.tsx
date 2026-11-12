@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { DangerZone } from "@/features/settings/danger-zone";
 import { SettingsForm } from "@/features/settings/settings-form";
 
 export default function SettingsPage() {
@@ -12,6 +13,7 @@ export default function SettingsPage() {
       <Suspense>
         <SettingsForm />
       </Suspense>
+      <DangerZone />
     </div>
   );
 }

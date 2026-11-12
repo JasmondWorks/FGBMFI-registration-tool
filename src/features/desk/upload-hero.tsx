@@ -55,8 +55,11 @@ export function UploadHero() {
             {isDragActive ? "Release to read the badges" : "Drop the badge files here and the sheets lay themselves out"}
           </h1>
           <p className="max-w-lg text-[15px] leading-relaxed text-muted-foreground">
-            Any number of PDFs from the registration platform. Each A4 sheet takes four, in the order you drop them, printed onto the
-            pre-printed convention cards.
+            Any number of PDFs from the registration platform. They're checked for duplicates and join the{" "}
+            <a href="/queue" className="underline underline-offset-2 hover:text-foreground">
+              print queue
+            </a>
+            . Every full sheet of 4 prints itself automatically — nothing to do for a clean batch.
           </p>
         </div>
 

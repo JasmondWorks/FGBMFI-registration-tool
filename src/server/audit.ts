@@ -22,7 +22,8 @@ export type AuditType =
   | "UNDERFILLED_OVERRIDE"
   | "DISCARDED"
   | "CLOUD_SYNCED"
-  | "CLOUD_FAILED";
+  | "CLOUD_FAILED"
+  | "RECONCILED_PRINTED";
 
 export type AuditInput = {
   type: AuditType;
