@@ -8,7 +8,7 @@ export const ACCEPTED_TYPES: Record<string, string[]> = {
 export const MAX_FILE_MB = 10;
 /** Protects the browser on very large drops. Not a business rule. */
 export const MAX_FILES_PER_UPLOAD = 400;
-export const ANALYZE_CONCURRENCY = 4;
+export const ANALYZE_CONCURRENCY = 10;
 
 export type IntakeFile = {
   key: string;

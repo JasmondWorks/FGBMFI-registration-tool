@@ -57,6 +57,7 @@ export async function buildSheetsPdf(sheets: SheetPage[], settings: PrintSetting
   const scale = settings.scalePct / 100;
   const dx = settings.offsetXmm * MM;
   const dy = -settings.offsetYmm * MM; // positive Y in settings means "move down"
+  const dyRow2 = -settings.offsetYmmRow2 * MM;
 
   for (const sheet of sheets) {
     const page = out.addPage([A4.w, A4.h]);
@@ -67,9 +68,10 @@ export async function buildSheetsPdf(sheets: SheetPage[], settings: PrintSetting
 
     for (const slot of sheet.slots) {
       const origin = quarterOrigin(slot.slot);
+      const isBottomRow = Math.floor((slot.slot - 1) / 2) === 1; // slots 3 & 4
       await drawSlot(out, page, slot, {
         x: origin.x + dx,
-        y: origin.y + dy,
+        y: origin.y + dy + (isBottomRow ? dyRow2 : 0),
         w: QUARTER.w,
         h: QUARTER.h,
         scale,
@@ -137,11 +139,13 @@ export async function buildCalibrationPdf(settings: PrintSettings): Promise<Uint
   }
   const dx = settings.offsetXmm * MM;
   const dy = -settings.offsetYmm * MM;
+  const dyRow2 = -settings.offsetYmmRow2 * MM;
   const color = rgb(0.75, 0.1, 0.1);
   for (let slot = 1; slot <= 4; slot++) {
     const o = quarterOrigin(slot);
+    const isBottomRow = Math.floor((slot - 1) / 2) === 1;
     // The badge's name baseline sits 193.6 pt above the bottom of the A6 page.
-    const nameY = o.y + (QUARTER.h - 419.53) + 193.6 + dy;
+    const nameY = o.y + (QUARTER.h - 419.53) + 193.6 + dy + (isBottomRow ? dyRow2 : 0);
     const cx = o.x + QUARTER.w / 2 + dx;
     page.drawLine({ start: { x: cx - 30 * MM, y: nameY }, end: { x: cx + 30 * MM, y: nameY }, thickness: 0.5, color });
     page.drawLine({ start: { x: cx, y: nameY - 6 * MM }, end: { x: cx, y: nameY + 6 * MM }, thickness: 0.5, color });

@@ -12,6 +12,7 @@ const KEY = "print";
 export const printSettingsSchema = z.object({
   offsetXmm: z.number().min(-20).max(20),
   offsetYmm: z.number().min(-20).max(20),
+  offsetYmmRow2: z.number().min(-20).max(20),
   scalePct: z.number().min(90).max(110),
   cutMarks: z.boolean(),
   printTemplate: z.boolean(),

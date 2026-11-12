@@ -118,6 +118,17 @@ export function SettingsForm() {
           <NumberField id="oy" label="Move down (mm)" value={form.offsetYmm} step={0.5} onChange={(v) => set("offsetYmm", v)} />
           <NumberField id="sc" label="Scale (%)" value={form.scalePct} step={0.5} onChange={(v) => set("scalePct", v)} />
         </div>
+        <NumberField
+          id="oy2"
+          label="Bottom row (cards 3 & 4): extra move up (mm)"
+          value={-form.offsetYmmRow2}
+          step={0.5}
+          onChange={(v) => set("offsetYmmRow2", -v)}
+        />
+        <p className="text-xs text-muted-foreground">
+          On top of the offset above. Printers often drift more on the trailing edge of the sheet, so if the bottom two
+          cards print lower than the top two, nudge this up.
+        </p>
         <label className="flex items-start gap-3 text-sm">
           <Checkbox checked={form.printTemplate} onCheckedChange={(v) => set("printTemplate", !!v)} className="mt-0.5" />
           <span>

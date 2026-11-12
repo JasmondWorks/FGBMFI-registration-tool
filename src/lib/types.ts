@@ -9,6 +9,9 @@ export type PrintSettings = {
   /** Shift everything on the sheet to correct printer drift. Positive X = right, positive Y = down. */
   offsetXmm: number;
   offsetYmm: number;
+  /** Extra Y shift for the bottom row only (slots 3 & 4), on top of offsetYmm. Printers often
+   *  drift more on the trailing edge of the sheet, so the two rows can need different corrections. */
+  offsetYmmRow2: number;
   /** 100 = actual size. Only change if the printer scales consistently. */
   scalePct: number;
   /** Small cut guides at the sheet edges. Off by default because the stock is pre-printed. */
@@ -24,6 +27,7 @@ export type PrintSettings = {
 export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
   offsetXmm: 0,
   offsetYmm: 0,
+  offsetYmmRow2: 0,
   scalePct: 100,
   cutMarks: false,
   printTemplate: false,
