@@ -17,6 +17,7 @@ import { PageViewer } from "@/features/viewer/page-viewer";
 
 const NAV = [
   { href: "/", label: "Print desk" },
+  { href: "/queue", label: "Queue" },
   { href: "/records", label: "Records" },
   { href: "/reprint", label: "Reprint" },
   { href: "/settings", label: "Settings" },

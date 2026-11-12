@@ -54,7 +54,13 @@ export function PageViewer() {
         {!page && !error && <Skeleton className="m-6 aspect-[210/297]" />}
         {page && (
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto p-6 sm:grid-cols-[1fr_220px]">
-            <SheetView items={page.items.map((i) => ({ slot: i.slot, card: i.card, printed: i.printed }))} offsetXmm={settings.offsetXmm} offsetYmm={settings.offsetYmm} renderWidth={420} />
+            <SheetView
+              items={page.items.map((i) => ({ slot: i.slot, card: i.card, printed: i.printed }))}
+              offsetXmm={settings.offsetXmm}
+              offsetYmm={settings.offsetYmm}
+              offsetYmmRow2={settings.offsetYmmRow2}
+              renderWidth={420}
+            />
             <div className="flex flex-col gap-4">
               <ol className="divide-y rounded-md border">
                 {page.items.map((i) => (

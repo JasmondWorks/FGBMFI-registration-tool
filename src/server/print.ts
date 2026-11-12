@@ -16,7 +16,7 @@ export async function buildPagesPdf(pageIds: string[]) {
   const views = await assertPrintable(pageIds);
   const cardIds = views.flatMap((v) => v.items.map((i) => i.card.id));
   const rows = cardIds.length
-    ? await db.select({ id: cards.id, localPath: cards.localPath, mimeType: cards.mimeType }).from(cards).where(inArray(cards.id, cardIds))
+    ? await db.select({ id: cards.id, localPath: cards.localPath, mimeType: cards.mimeType, cropBox: cards.cropBox }).from(cards).where(inArray(cards.id, cardIds))
     : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
 
@@ -27,7 +27,7 @@ export async function buildPagesPdf(pageIds: string[]) {
       const info = byId.get(item.card.id);
       const bytes = info ? await readStoredFile(info.localPath) : null;
       if (!info || !bytes) throw new UserError(`The file for ${item.card.fullName} is missing on this laptop`);
-      slots.push({ slot: item.slot, bytes: new Uint8Array(bytes), mime: info.mimeType });
+      slots.push({ slot: item.slot, bytes: new Uint8Array(bytes), mime: info.mimeType, cropBox: info.cropBox ?? undefined });
     }
     sheets.push({ slots, label: `${v.jobKind === "REPRINT" ? "Reprint " : ""}page ${v.pageNumber}` });
   }

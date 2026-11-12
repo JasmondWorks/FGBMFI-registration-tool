@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { api, errorMessage, getOperator, runPool } from "@/lib/api";
@@ -55,6 +56,7 @@ export function validateFiles(input: File[]) {
 }
 
 export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
+  const router = useRouter();
   const [state, setState] = React.useState<IntakeState>(initial);
   const busy = state.phase !== "idle";
 
@@ -95,16 +97,37 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
           }
           return;
         }
-        const layout = await api<{ ok: boolean; job: JobView }>(`/api/jobs/${committed.jobId}/layout`, { method: "POST", json: {} });
         emitDeskChanged();
         setState(initial);
-        onJobReady(committed.jobId, layout.job);
+        if (targetJobId) {
+          // Adding files to a job someone's already actively working (e.g. the Fix the
+          // Count dialog's "add more"): keep that flow as it was, stay in that preview.
+          const layout = await api<{ ok: boolean; job: JobView }>(`/api/jobs/${committed.jobId}/layout`, { method: "POST", json: {} });
+          onJobReady(committed.jobId, layout.job);
+        } else {
+          // A fresh upload: badges land in the global queue, then every complete sheet
+          // the queue now supports (across all uploads, FIFO) builds and opens right
+          // away — so a clean multiple-of-4 upload just prints, same as before the
+          // queue existed. Any remainder that doesn't complete a sheet stays queued.
+          const built = await api<{ ok: boolean; needsCountFix?: boolean; jobId?: string | null; job?: JobView } | null>("/api/queue/build-all", {
+            method: "POST",
+            json: {},
+          });
+          if (built?.jobId && built.job) {
+            onJobReady(built.jobId, built.job);
+          } else {
+            toast.success(`${pluralize(committed.cardIds.length, "badge")} added to the queue`, {
+              description: "Not enough for a full sheet yet.",
+              action: { label: "Open queue", onClick: () => router.push("/queue") },
+            });
+          }
+        }
       } catch (err) {
         toast.error(errorMessage(err));
         setState((s) => ({ ...s, phase: s.flagged.length ? "review" : "idle" }));
       }
     },
-    [onJobReady],
+    [onJobReady, router],
   );
 
   const start = React.useCallback(

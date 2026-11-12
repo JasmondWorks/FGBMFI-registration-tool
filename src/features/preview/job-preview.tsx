@@ -102,6 +102,20 @@ export function JobPreview() {
 
   function printAll() {
     if (blocked) return setFix({ base: {} });
+    const cards = readyPages.reduce((n, p) => n + p.items.length, 0);
+    if (readyPages.length > 1 && settings.printMode === "BROWSER") {
+      // Multiple sheets in one browser print job: if the printer's own default is
+      // double-sided, sheet 2 prints on the BACK of sheet 1's single-sided pre-printed
+      // stock instead of a fresh sheet. The app can't change that setting for you — the
+      // system print dialog that's about to open is the only place to do it.
+      const ok = window.confirm(
+        `Print ${pluralize(readyPages.length, "sheet")} (${pluralize(cards, "card")})?\n\n` +
+          `IMPORTANT: in the print dialog that opens next, make sure "Two-sided" / "Duplex" is OFF ` +
+          `(set to one-sided / simplex). These cards are pre-printed on one side only — if duplex is ` +
+          `on, sheet 2 will print on the back of sheet 1 instead of its own sheet.`,
+      );
+      if (!ok) return;
+    }
     void printPages(readyPages.map((p) => p.id));
   }
 
@@ -248,6 +262,7 @@ export function JobPreview() {
                       showTemplate={showTemplate}
                       offsetXmm={settings.offsetXmm}
                       offsetYmm={settings.offsetYmm}
+                      offsetYmmRow2={settings.offsetYmmRow2}
                       renderWidth={560}
                       selectedSlot={slot}
                       onSlotClick={setSlot}

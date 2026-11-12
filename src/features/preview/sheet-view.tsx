@@ -21,6 +21,8 @@ type SheetViewProps = {
   showTemplate?: boolean;
   offsetXmm?: number;
   offsetYmm?: number;
+  /** Extra Y shift for the bottom row only (slots 3 & 4), on top of offsetYmm. */
+  offsetYmmRow2?: number;
   /** Rough on-screen width, used to pick the render resolution. */
   renderWidth?: number;
   selectedSlot?: number | null;
@@ -33,13 +35,13 @@ export function SheetView({
   showTemplate = true,
   offsetXmm = 0,
   offsetYmm = 0,
+  offsetYmmRow2 = 0,
   renderWidth = 520,
   selectedSlot,
   onSlotClick,
   className,
 }: SheetViewProps) {
   const bySlot = new Map(items.map((i) => [i.slot, i]));
-  const shift = { transform: `translate(${(offsetXmm / 210) * 100}%, ${(offsetYmm / 297) * 100}%)` };
 
   return (
     <div className={cn("a4-sheet relative w-full overflow-hidden select-none", className)}>
@@ -47,18 +49,20 @@ export function SheetView({
         // eslint-disable-next-line @next/next/no-img-element
         <img src="/template/a4-template.jpg" alt="" aria-hidden className="pointer-events-none absolute inset-0 size-full object-fill" />
       )}
-      <div className="absolute inset-0" style={shift}>
+      <div className="absolute inset-0">
         {[1, 2, 3, 4].map((slot) => {
           const item = bySlot.get(slot);
           const col = (slot - 1) % 2;
           const row = Math.floor((slot - 1) / 2);
           const selected = selectedSlot === slot;
           const interactive = !!onSlotClick && !!item;
+          const y = offsetYmm + (row === 1 ? offsetYmmRow2 : 0);
+          const shift = { transform: `translate(${(offsetXmm / 210) * 100}%, ${(y / 297) * 100}%)` };
           return (
             <div
               key={slot}
               className="absolute"
-              style={{ left: `${col * 50}%`, top: `${row * 50}%`, width: "50%", height: "50%" }}
+              style={{ left: `${col * 50}%`, top: `${row * 50}%`, width: "50%", height: "50%", ...shift }}
             >
               {item ? (
                 <button

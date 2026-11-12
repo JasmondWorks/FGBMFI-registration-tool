@@ -97,7 +97,7 @@ export type PageItemView = {
 export type PageView = {
   id: string;
   jobId: string;
-  jobKind: "UPLOAD" | "REPRINT";
+  jobKind: "UPLOAD" | "REPRINT" | "QUEUE";
   jobReason: string | null;
   pageNumber: number;
   status: PageStatus;
@@ -115,7 +115,7 @@ export type PageView = {
 
 export type JobView = {
   id: string;
-  kind: "UPLOAD" | "REPRINT";
+  kind: "UPLOAD" | "REPRINT" | "QUEUE";
   operator: string;
   reason: string | null;
   createdAt: string;
@@ -144,7 +144,7 @@ export type CardDetail = CardSummary & {
   firstPrintedAt: string | null;
   cloudinaryUrl: string | null;
   history: AuditEntry[];
-  pages: { pageId: string; jobKind: "UPLOAD" | "REPRINT"; pageNumber: number; status: PageStatus; slot: number; printed: boolean | null; sentAt: string | null }[];
+  pages: { pageId: string; jobKind: "UPLOAD" | "REPRINT" | "QUEUE"; pageNumber: number; status: PageStatus; slot: number; printed: boolean | null; sentAt: string | null }[];
 };
 
 export type Facets = {

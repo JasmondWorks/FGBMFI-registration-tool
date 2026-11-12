@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   bigserial,
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -29,7 +30,8 @@ export const cardStatus = pgEnum("card_status", [
 
 export const extractionSource = pgEnum("extraction_source", ["TEXT_LAYER", "OCR", "FILENAME_ONLY"]);
 export const cloudStatus = pgEnum("cloud_status", ["PENDING", "SYNCED", "FAILED", "DISABLED"]);
-export const jobKind = pgEnum("job_kind", ["UPLOAD", "REPRINT"]);
+export const jobKind = pgEnum("job_kind", ["UPLOAD", "REPRINT", "QUEUE"]);
+export const badgeFormat = pgEnum("badge_format", ["OVERLAY", "FULL_CARD"]);
 export const pageStatus = pgEnum("page_status", ["READY", "SENT", "SPOOLED", "CONFIRMED", "PARTIAL", "CANCELLED"]);
 export const printMode = pgEnum("print_mode", ["BROWSER", "DIRECT"]);
 
@@ -88,8 +90,18 @@ export const cards = pgTable(
     needsReview: boolean("needs_review").notNull().default(false),
     reviewReasons: text("review_reasons").array().notNull().default(sql`'{}'::text[]`),
 
+    // Some registration platforms export the whole card (pre-printed artwork baked in)
+    // rather than a transparent name-only overlay. FULL_CARD badges need the dynamic
+    // region cropped out before they're placed on pre-printed stock; cropBox holds that
+    // region in PDF points (bottom-left origin) once it's been calibrated.
+    badgeFormat: badgeFormat("badge_format").notNull().default("OVERLAY"),
+    cropBox: jsonb("crop_box").$type<{ x: number; y: number; width: number; height: number }>(),
+
     // lifecycle
     status: cardStatus("status").notNull().default("UPLOADED"),
+    // Manual priority within the print queue. Lower sorts first; null falls back to
+    // createdAt (FIFO). Fractional indexing: moving one card only rewrites its own rank.
+    queueRank: doublePrecision("queue_rank"),
     supersededById: uuid("superseded_by_id"),
     printCount: integer("print_count").notNull().default(0),
     firstPrintedAt: timestamp("first_printed_at", { withTimezone: true }),
@@ -108,6 +120,7 @@ export const cards = pgTable(
     index("cards_chapter_idx").on(t.chapter),
     index("cards_last_printed_idx").on(t.lastPrintedAt),
     index("cards_created_idx").on(t.createdAt),
+    index("cards_queue_rank_idx").on(t.queueRank),
   ],
 );
 

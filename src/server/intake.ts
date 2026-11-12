@@ -211,6 +211,7 @@ export async function commitIntake(input: {
           extractionSource: x.extractionSource,
           needsReview: x.needsReview,
           reviewReasons: x.reviewReasons,
+          badgeFormat: x.badgeFormat,
           status: "UPLOADED",
           uploadedBy: operator,
           // keep upload order stable for paging

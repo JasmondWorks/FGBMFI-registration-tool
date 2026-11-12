@@ -29,6 +29,7 @@ export type Extraction = {
   pageHeightPt: number | null;
   needsReview: boolean;
   reviewReasons: string[];
+  badgeFormat: "OVERLAY" | "FULL_CARD";
 };
 
 const A6 = { w: 297.64, h: 419.53 };
@@ -37,7 +38,22 @@ export function sha256(bytes: Uint8Array) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-type PdfText = { lines: BadgeLine[]; rawText: string; width: number; height: number };
+type PdfText = { lines: BadgeLine[]; rawText: string; width: number; height: number; hasEmbeddedImage: boolean };
+
+/**
+ * Some registration platforms export the whole card (pre-printed artwork baked into the
+ * PDF) instead of a transparent name-only overlay. We can't tell these apart by text
+ * content alone, but the overlay format is pure vector text with no raster images, so any
+ * embedded image on the page is a strong signal this is the other format. We don't yet
+ * know the crop geometry for it (no sample on hand), so this only flags it for review
+ * rather than guessing where the dynamic region is.
+ */
+async function hasEmbeddedImage(page: { getOperatorList(): Promise<{ fnArray: number[] }> }) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const ops = await page.getOperatorList();
+  const imageOps = new Set<number>([pdfjs.OPS.paintImageXObject, pdfjs.OPS.paintInlineImageXObject, pdfjs.OPS.paintImageXObjectRepeat]);
+  return ops.fnArray.some((fn) => imageOps.has(fn));
+}
 
 async function readPdfText(bytes: Uint8Array): Promise<PdfText> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
@@ -51,6 +67,7 @@ async function readPdfText(bytes: Uint8Array): Promise<PdfText> {
     const page = await doc.getPage(1);
     const viewport = page.getViewport({ scale: 1 });
     const content = await page.getTextContent();
+    const hasImage = await hasEmbeddedImage(page);
 
     // Group text runs into lines by their baseline. The badge draws the name three
     // times with tiny x offsets (faux bold), so identical runs on a line are de-duplicated.
@@ -82,6 +99,7 @@ async function readPdfText(bytes: Uint8Array): Promise<PdfText> {
       rawText: lines.map((l) => l.text).join("\n"),
       width: viewport.width,
       height: viewport.height,
+      hasEmbeddedImage: hasImage,
     };
   } finally {
     await task.destroy();
@@ -99,6 +117,7 @@ export async function extractBadge(bytes: Uint8Array, mime: string, filename: st
   }
 
   let text: PdfText | null = null;
+  let badgeFormat: "OVERLAY" | "FULL_CARD" = "OVERLAY";
   if (mime === "application/pdf") {
     try {
       text = await readPdfText(bytes);
@@ -108,6 +127,12 @@ export async function extractBadge(bytes: Uint8Array, mime: string, filename: st
     if (text && (Math.abs(text.width - A6.w) > 3 || Math.abs(text.height - A6.h) > 3)) {
       reasons.push(
         `Page is ${Math.round((text.width / 72) * 25.4)} x ${Math.round((text.height / 72) * 25.4)} mm, not A6 (105 x 148 mm). It will be scaled to fit.`,
+      );
+    }
+    if (text?.hasEmbeddedImage) {
+      badgeFormat = "FULL_CARD";
+      reasons.push(
+        "This file has a background image baked in, not just a name overlay. It will print the card artwork again on top of the pre-printed stock until someone calibrates the crop region for this format — check it before printing.",
       );
     }
   } else {
@@ -195,5 +220,6 @@ export async function extractBadge(bytes: Uint8Array, mime: string, filename: st
     pageHeightPt: text ? Math.round(text.height) : null,
     needsReview: reasons.length > 0,
     reviewReasons: reasons,
+    badgeFormat,
   };
 }

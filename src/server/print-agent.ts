@@ -54,8 +54,25 @@ export async function printPdf(pdf: Uint8Array, printerName: string, title: stri
   await fs.writeFile(file, pdf);
   try {
     if (isWindows) return await printWindows(file, printerName, title);
-    // -o fit-to-page=false and media=A4 keep the sheet at actual size.
-    const { stdout } = await run("lp", ["-d", printerName, "-t", title, "-o", "media=A4", "-o", "fit-to-page=false", "-o", "print-scaling=none", file]);
+    // -o fit-to-page=false and media=A4 keep the sheet at actual size. sides=one-sided is
+    // required: the card stock is pre-printed on one side only, so if the printer's own
+    // default is double-sided, a 2-page job would print page 2 on the back of page 1's
+    // sheet instead of a fresh sheet.
+    const { stdout } = await run("lp", [
+      "-d",
+      printerName,
+      "-t",
+      title,
+      "-o",
+      "media=A4",
+      "-o",
+      "fit-to-page=false",
+      "-o",
+      "print-scaling=none",
+      "-o",
+      "sides=one-sided",
+      file,
+    ]);
     const match = stdout.match(/request id is (\S+)/);
     if (!match) throw new Error(`Printer didn't return a job id: ${stdout.trim()}`);
     return match[1];
@@ -68,7 +85,8 @@ export async function printPdf(pdf: Uint8Array, printerName: string, title: stri
 async function printWindows(file: string, printerName: string, title: string) {
   const ptp = await import("pdf-to-printer");
   const before = await windowsJobIds(printerName);
-  await ptp.print(file, { printer: printerName, scale: "noscale", paperSize: "A4", silent: true });
+  // side: "simplex" forces one-sided, same reasoning as sides=one-sided on CUPS above.
+  await ptp.print(file, { printer: printerName, scale: "noscale", paperSize: "A4", side: "simplex", silent: true });
   // Find the job that appeared after we printed.
   for (let i = 0; i < 10; i++) {
     const after = await windowsJobIds(printerName);

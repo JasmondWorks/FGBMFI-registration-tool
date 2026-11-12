@@ -28,6 +28,10 @@ export type SheetSlot = {
   slot: number; // 1..4
   bytes: Uint8Array;
   mime: string;
+  /** For FULL_CARD-format badges: the dynamic (name) region to crop out, in PDF points
+   *  (bottom-left origin), so only that region is placed onto the pre-printed stock
+   *  instead of the whole baked-in card. Undefined/OVERLAY badges use the full page. */
+  cropBox?: { x: number; y: number; width: number; height: number };
 };
 
 export type SheetPage = { slots: SheetSlot[]; label?: string };
@@ -94,7 +98,15 @@ async function drawSlot(
   box: { x: number; y: number; w: number; h: number; scale: number },
 ) {
   if (slot.mime === "application/pdf") {
-    const [embedded] = await out.embedPdf(slot.bytes, [0]);
+    let embedded;
+    if (slot.cropBox) {
+      const src = await PDFDocument.load(slot.bytes);
+      const srcPage = src.getPage(0);
+      const { x, y, width, height } = slot.cropBox;
+      embedded = await out.embedPage(srcPage, { left: x, bottom: y, right: x + width, top: y + height });
+    } else {
+      [embedded] = await out.embedPdf(slot.bytes, [0]);
+    }
     const fit = fitInto(embedded.width, embedded.height, box.w, box.h);
     const w = embedded.width * fit * box.scale;
     const h = embedded.height * fit * box.scale;
