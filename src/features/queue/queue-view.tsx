@@ -112,8 +112,17 @@ export function QueueView() {
     if (!requireOperator()) return;
     try {
       await api("/api/queue/reorder", { method: "POST", json: { orderedIds: [...selected] } });
+      setSelected(new Set());
       emitDeskChanged();
-      toast.success(`${pluralize(selected.size, "badge")} moved to the front of the queue`);
+      // Prioritizing isn't a separate step from printing: if that was enough to complete
+      // a sheet, it goes straight to the printer like a fresh upload would.
+      const built = await api<{ jobId?: string | null; job?: JobView } | null>("/api/queue/build-all", { method: "POST", json: {} });
+      if (built?.jobId && built.job) {
+        toast.success("Prioritized — sheet is ready");
+        overlay.open("job", built.jobId);
+      } else {
+        toast.success(`${pluralize(selected.size, "badge")} moved to the front of the queue`);
+      }
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -199,7 +208,8 @@ export function QueueView() {
       )}
       {selectedRows.length === 0 && rows.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          Select any {CARDS_PER_PAGE} and "Print selected now" to pick out of order, or "Build next sheet" to pull the oldest {CARDS_PER_PAGE} automatically.
+          Search and select any badges: "Move to front" prioritizes them and prints right away if that completes a sheet, or "Print
+          selected now" to print exactly that pick immediately regardless of order.
         </p>
       )}
     </div>
