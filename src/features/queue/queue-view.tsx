@@ -48,6 +48,19 @@ export function QueueView() {
   const districts = result.data?.districts ?? [];
   const selectedRows = rows.filter((r) => selected.has(r.id));
 
+  // A selected badge can leave the queue on its own (printed via another tab, swept up
+  // by an upload's auto-build, etc). Drop it from the selection once it's no longer in
+  // the list, so "N selected" never claims more than what's actually still there.
+  const rowIds = result.data ? rows.map((r) => r.id).join(",") : null;
+  React.useEffect(() => {
+    if (rowIds === null) return;
+    const present = new Set(rowIds ? rowIds.split(",") : []);
+    setSelected((prev) => {
+      const next = new Set([...prev].filter((id) => present.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [rowIds]);
+
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -63,14 +76,14 @@ export function QueueView() {
     try {
       const res = await api<{ ok: boolean; needsCountFix?: boolean; missing?: number; jobId?: string | null; job?: JobView }>(
         "/api/queue/build",
-        { method: "POST", json: { cardIds: [...selected], allowUnderfilled } },
+        { method: "POST", json: { cardIds: selectedRows.map((r) => r.id), allowUnderfilled } },
       );
       if (res.needsCountFix) {
         // A deliberately hand-picked list (e.g. specific priority names from a search)
         // doesn't need the usual "round up to 4" friction — offer to just print the last
         // sheet with empty slots instead of blocking.
         const ok = window.confirm(
-          `${selected.size} badges picked — the last sheet will have ${res.missing} blank slot${res.missing === 1 ? "" : "s"}. Print it anyway?`,
+          `${selectedRows.length} badges picked — the last sheet will have ${res.missing} blank slot${res.missing === 1 ? "" : "s"}. Print it anyway?`,
         );
         if (ok) return printSelected(true);
         toast.message("Not printed", { description: "Add or remove a badge to make it a multiple of 4, or try again to print underfilled." });
@@ -108,10 +121,10 @@ export function QueueView() {
   }
 
   async function moveToTop() {
-    if (selected.size === 0) return;
+    if (selectedRows.length === 0) return;
     if (!requireOperator()) return;
     try {
-      await api("/api/queue/reorder", { method: "POST", json: { orderedIds: [...selected] } });
+      await api("/api/queue/reorder", { method: "POST", json: { orderedIds: selectedRows.map((r) => r.id) } });
       setSelected(new Set());
       emitDeskChanged();
       // Prioritizing isn't a separate step from printing: if that was enough to complete
@@ -121,7 +134,7 @@ export function QueueView() {
         toast.success("Prioritized — sheet is ready");
         overlay.open("job", built.jobId);
       } else {
-        toast.success(`${pluralize(selected.size, "badge")} moved to the front of the queue`);
+        toast.success(`${pluralize(selectedRows.length, "badge")} moved to the front of the queue`);
       }
     } catch (err) {
       toast.error(errorMessage(err));
@@ -157,11 +170,11 @@ export function QueueView() {
         )}
       </div>
 
-      {selected.size > 0 && (
+      {selectedRows.length > 0 && (
         <div className="sticky top-16 z-10 flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 shadow-sm">
-          <span className="text-sm font-medium">{pluralize(selected.size, "selected")}</span>
-          <span className={cn("tnum text-xs", checkCount(selected.size).ok ? "text-success" : "text-warning")}>
-            {describeCount(checkCount(selected.size))}
+          <span className="text-sm font-medium">{pluralize(selectedRows.length, "selected")}</span>
+          <span className={cn("tnum text-xs", checkCount(selectedRows.length).ok ? "text-success" : "text-warning")}>
+            {describeCount(checkCount(selectedRows.length))}
           </span>
           <div className="ml-auto flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={moveToTop}>
