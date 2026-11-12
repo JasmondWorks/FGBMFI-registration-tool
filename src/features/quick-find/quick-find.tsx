@@ -58,11 +58,14 @@ export function QuickFind() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-9 w-full max-w-72 items-center gap-2 rounded-md border bg-card px-3 text-sm text-muted-foreground shadow-xs transition-colors hover:border-input focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+        aria-label="Find a badge"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-xs transition-colors hover:border-input focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none sm:w-full sm:max-w-72 sm:justify-start sm:gap-2 sm:px-3"
       >
         <SearchIcon />
-        <span className="flex-1 text-left">Find a badge</span>
-        <Kbd>Ctrl K</Kbd>
+        <span className="hidden flex-1 text-left sm:inline">Find a badge</span>
+        <span className="hidden sm:inline">
+          <Kbd>Ctrl K</Kbd>
+        </span>
       </button>
       <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>
         <CommandInput value={q} onValueChange={onQuery} placeholder="Name, chapter, district, registration ID or filename" />

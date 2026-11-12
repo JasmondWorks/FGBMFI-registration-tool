@@ -48,7 +48,7 @@ export function PagesTable() {
           </SelectContent>
         </Select>
       </div>
-      <div className="overflow-hidden rounded-md border bg-card">
+      <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow className="hover:bg-transparent">

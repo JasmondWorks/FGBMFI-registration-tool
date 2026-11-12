@@ -39,14 +39,15 @@ export function OperatorPicker() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="group flex h-9 items-center gap-2.5 rounded-md border border-transparent px-2.5 text-left transition-colors hover:border-border hover:bg-card focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+          aria-label="Who's at the desk"
+          className="group flex h-9 shrink-0 items-center gap-2.5 rounded-md border border-transparent px-1.5 text-left transition-colors hover:border-border hover:bg-card focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none sm:px-2.5"
         >
-          <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
             {operator ? operator.charAt(0).toUpperCase() : "?"}
           </span>
-          <span className="flex flex-col leading-tight">
+          <span className="hidden min-w-0 flex-col leading-tight sm:flex">
             <span className="text-[10px] tracking-[0.08em] text-muted-foreground uppercase">At the desk</span>
-            <span className="text-sm font-medium">{ready ? operator || "Choose operator" : ""}</span>
+            <span className="truncate text-sm font-medium">{ready ? operator || "Choose operator" : ""}</span>
           </span>
         </button>
       </PopoverTrigger>
