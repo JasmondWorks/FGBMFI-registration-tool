@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
 import { api, errorMessage } from "@/lib/api";
-import { emitDeskChanged, useFetch } from "@/lib/events";
-import { PAGE_STATUS, personLabel, relativeTime, shortTime } from "@/lib/format";
-import type { CardSummary, PageView } from "@/lib/types";
+import { useFetch } from "@/lib/events";
+import { PAGE_STATUS, relativeTime, shortTime } from "@/lib/format";
+import type { PageView } from "@/lib/types";
 import { pluralize } from "@/lib/utils";
 import { useOverlay } from "@/features/overlays/use-overlay";
 import { usePrint } from "@/features/print/print-provider";
@@ -19,8 +19,6 @@ type Overview = {
   waiting: PageView[];
   recent: PageView[];
   openJobs: { id: string; kind: "UPLOAD" | "REPRINT"; createdAt: string; readyPages: number }[];
-  unplacedJobs: { id: string; count: number }[];
-  tray: CardSummary[];
 };
 
 export function DeskOverview() {
@@ -50,12 +48,26 @@ export function DeskOverview() {
   return (
     <div className="flex flex-col gap-8">
       <dl className="grid grid-cols-2 border-y sm:grid-cols-4">
-        {stats.map((s, i) => (
-          <div key={s.label} className={i > 0 ? "border-l px-5 py-4" : "py-4 pr-5"}>
-            <dt className="text-xs text-muted-foreground">{s.label}</dt>
-            <dd className="tnum mt-1 text-2xl font-semibold tracking-[-0.02em]">{s.value}</dd>
-          </div>
-        ))}
+        {stats.map((s, i) => {
+          const body = (
+            <>
+              <dt className="text-xs text-muted-foreground">{s.label}</dt>
+              <dd className="tnum mt-1 text-2xl font-semibold tracking-[-0.02em] group-hover:text-primary">{s.value}</dd>
+            </>
+          );
+          const cls = i > 0 ? "border-l px-5 py-4" : "py-4 pr-5";
+          // "Not printed yet" is a count of the queue — link straight there instead of
+          // repeating the same list in a second place on this page.
+          return s.label === "Not printed yet" ? (
+            <a key={s.label} href="/queue" className={`group ${cls} transition-colors hover:bg-accent/30`}>
+              {body}
+            </a>
+          ) : (
+            <div key={s.label} className={cls}>
+              {body}
+            </div>
+          );
+        })}
       </dl>
 
       {(c.needsReview > 0 || c.cloudFailed > 0) && (
@@ -102,21 +114,11 @@ export function DeskOverview() {
 
         <div className="flex flex-col gap-8">
           <section aria-labelledby="ready-h" className="flex flex-col gap-3">
-            <SectionHead id="ready-h" title="Ready to print" hint="Uploads and reprints with sheets not printed yet." />
-            {data.openJobs.length === 0 && data.unplacedJobs.length === 0 ? (
-              <Empty>No sheets waiting to print.</Empty>
+            <SectionHead id="ready-h" title="Built, not printed" hint="Sheets already laid out — pick up where you left off." />
+            {data.openJobs.length === 0 ? (
+              <Empty>Nothing built and waiting. New uploads print themselves once a sheet is full.</Empty>
             ) : (
               <ul className="divide-y rounded-md border bg-card">
-                {data.unplacedJobs.map((j) => (
-                  <li key={`u-${j.id}`} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <span className="text-sm">
-                      <span className="font-medium">{pluralize(j.count, "badge")}</span> not on a sheet yet
-                    </span>
-                    <Button size="sm" variant="outline" onClick={() => overlay.open("job", j.id)}>
-                      Fix the count
-                    </Button>
-                  </li>
-                ))}
                 {data.openJobs.map((j) => (
                   <li key={j.id} className="flex items-center justify-between gap-3 px-4 py-3">
                     <span className="flex flex-col">
@@ -126,28 +128,8 @@ export function DeskOverview() {
                       <span className="text-xs text-muted-foreground">Started {shortTime(j.createdAt)}</span>
                     </span>
                     <Button size="sm" onClick={() => overlay.open("job", j.id)}>
-                      Open preview
+                      Open
                     </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section aria-labelledby="tray-h" className="flex flex-col gap-3">
-            <SectionHead id="tray-h" title="Waiting tray" hint="Held back to complete a sheet. They go first on the next upload.">
-              {data.tray.length > 0 && <ReleaseTray />}
-            </SectionHead>
-            {data.tray.length === 0 ? (
-              <Empty>The tray is empty.</Empty>
-            ) : (
-              <ul className="divide-y rounded-md border bg-card">
-                {data.tray.map((t) => (
-                  <li key={t.id}>
-                    <button onClick={() => overlay.open("view", t.id)} className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted/50">
-                      <span className="truncate">{personLabel(t)}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">{t.chapter}</span>
-                    </button>
                   </li>
                 ))}
               </ul>
@@ -194,31 +176,6 @@ function SectionHead({ id, title, hint, children, className }: { id?: string; ti
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <p className="rounded-md border border-dashed px-4 py-5 text-sm text-muted-foreground">{children}</p>;
-}
-
-function ReleaseTray() {
-  const [busy, setBusy] = React.useState(false);
-  return (
-    <Button
-      size="sm"
-      variant="ghost"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        try {
-          await api("/api/tray", { method: "DELETE" });
-          emitDeskChanged();
-          toast.message("Tray emptied. Those badges are back in 'not printed'.");
-        } catch (err) {
-          toast.error(errorMessage(err));
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      Empty tray
-    </Button>
-  );
 }
 
 function CloudRetry({ count }: { count: number }) {

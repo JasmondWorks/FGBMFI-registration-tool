@@ -456,23 +456,11 @@ export async function getDeskOverview() {
     .groupBy(jobs.id)
     .orderBy(desc(jobs.createdAt))
     .limit(5);
-  const unplacedJobs = await db
-    .select({ id: jobs.id, count: sql<number>`count(${cards.id})` })
-    .from(jobs)
-    .innerJoin(cards, and(eq(cards.jobId, jobs.id), eq(cards.status, "UPLOADED")))
-    .where(eq(jobs.kind, "UPLOAD"))
-    .groupBy(jobs.id)
-    .orderBy(desc(jobs.createdAt))
-    .limit(5);
-  const tray = await getTray();
-
   return {
     counts: Object.fromEntries(Object.entries(counts).map(([k, v]) => [k, Number(v)])) as Record<keyof typeof counts, number>,
     waiting: await getPageViews(waiting.map((w) => w.id)),
     recent: await getPageViews(recent.map((r) => r.id)),
     openJobs: openJobs.map((j) => ({ id: j.id, kind: j.kind, createdAt: j.createdAt.toISOString(), readyPages: Number(j.ready) })),
-    unplacedJobs: unplacedJobs.map((j) => ({ id: j.id, count: Number(j.count) })),
-    tray: tray.map(toCardSummary),
   };
 }
 
