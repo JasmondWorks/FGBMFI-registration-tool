@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,9 +19,27 @@ const SIZE = 20;
 /** Every sheet that has gone to the printer, originals and reprints, for auditing. */
 export function PagesTable() {
   const overlay = useOverlay();
-  const [status, setStatus] = React.useState("all");
-  const [kind, setKind] = React.useState("all");
-  const [page, setPage] = React.useState(1);
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+
+  // Filters live in the URL (same pattern as the Badges tab) so a filtered view can be
+  // bookmarked or survive a refresh. Scoped to this tab's own keys so it doesn't disturb
+  // the "tab" param the parent tabs component also keeps here.
+  const status = params.get("pStatus") ?? "all";
+  const kind = params.get("pKind") ?? "all";
+  const page = Math.max(1, Number(params.get("pPage")) || 1);
+
+  function update(patch: Record<string, string | null>) {
+    const next = new URLSearchParams(params.toString());
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null || value === "all") next.delete(key);
+      else next.set(key, value);
+    }
+    if (!("pPage" in patch)) next.delete("pPage");
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  }
+
   const qs = new URLSearchParams({ page: String(page), size: String(SIZE) });
   if (status !== "all") qs.set("status", status);
   if (kind !== "all") qs.set("kind", kind);
@@ -30,7 +49,7 @@ export function PagesTable() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
+        <Select value={status} onValueChange={(v) => update({ pStatus: v })}>
           <SelectTrigger className="h-8 w-44" aria-label="Sheet status"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Any status</SelectItem>
@@ -39,7 +58,7 @@ export function PagesTable() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={kind} onValueChange={(v) => { setKind(v); setPage(1); }}>
+        <Select value={kind} onValueChange={(v) => update({ pKind: v })}>
           <SelectTrigger className="h-8 w-40" aria-label="Sheet type"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Originals and reprints</SelectItem>
@@ -87,8 +106,8 @@ export function PagesTable() {
       </div>
       <div className="flex items-center justify-end gap-2 text-sm">
         <span className="tnum text-muted-foreground">Page {page} of {pageCount}</span>
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>Previous</Button>
-        <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => setPage((n) => n + 1)}>Next</Button>
+        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => update({ pPage: String(page - 1) })}>Previous</Button>
+        <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => update({ pPage: String(page + 1) })}>Next</Button>
       </div>
     </div>
   );

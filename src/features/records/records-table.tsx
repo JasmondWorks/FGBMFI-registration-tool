@@ -276,8 +276,34 @@ export function RecordsTable() {
   const f = facets.data;
   const extraFacetKeys = Object.keys(f?.extra ?? {});
 
+  const confirmedState = query.status.includes("PRINTED") ? "confirmed" : query.status.includes("NOT_PRINTED") ? "not" : "all";
+
   return (
     <div className="flex flex-col gap-3 pb-24">
+      {/* Confirmed-printed split: the main way to answer "has this actually printed?" */}
+      <div className="flex w-fit rounded-md border bg-card p-0.5 text-sm">
+        {(
+          [
+            { key: "all", label: "All", status: [] },
+            { key: "confirmed", label: "Confirmed as printed", status: ["PRINTED"] },
+            { key: "not", label: "Not confirmed as printed", status: ["NOT_PRINTED"] },
+          ] as const
+        ).map((opt) => (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => update({ status: [...opt.status] })}
+            aria-pressed={confirmedState === opt.key}
+            className={cn(
+              "rounded-[5px] px-3 py-1.5 transition-colors",
+              confirmedState === opt.key ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-full max-w-sm">
@@ -300,9 +326,11 @@ export function RecordsTable() {
         />
         <FacetFilter
           title="Status"
-          options={(f?.status ?? []).map((s) => ({ ...s, label: FILTER_STATUS_LABELS[s.value] ?? s.value }))}
-          selected={query.status}
-          onChange={(v) => update({ status: v })}
+          // PRINTED/NOT_PRINTED live in the "Confirmed as printed" toggle above instead,
+          // so this isn't two controls fighting over the same question.
+          options={(f?.status ?? []).filter((s) => s.value !== "PRINTED" && s.value !== "NOT_PRINTED").map((s) => ({ ...s, label: FILTER_STATUS_LABELS[s.value] ?? s.value }))}
+          selected={query.status.filter((s) => s !== "PRINTED" && s !== "NOT_PRINTED")}
+          onChange={(v) => update({ status: [...query.status.filter((s) => s === "PRINTED" || s === "NOT_PRINTED"), ...v] })}
         />
         {(f?.printedBy.length ?? 0) > 0 && (
           <FacetFilter title="Printed by" options={f!.printedBy} selected={query.printedBy} onChange={(v) => update({ printedBy: v })} />
