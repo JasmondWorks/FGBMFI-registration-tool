@@ -225,13 +225,9 @@ export function ReprintBuilder() {
 function SearchPanel({ inputRef, picked, onAdd }: { inputRef: React.RefObject<HTMLInputElement | null>; picked: Set<string>; onAdd: (ids: string[]) => void }) {
   const [q, setQ] = React.useState("");
   const [debounced, setDebounced] = React.useState("");
-  const [district, setDistrictRaw] = React.useState<string[]>([]);
-  const [chapter, setChapterRaw] = React.useState<string[]>([]);
   const [status, setStatusRaw] = React.useState<string[]>(["PRINTED"]);
   const [page, setPage] = React.useState(1);
   // Any change to the search or filters goes back to the first page of results.
-  const setDistrict = (v: string[]) => (setDistrictRaw(v), setPage(1));
-  const setChapter = (v: string[]) => (setChapterRaw(v), setPage(1));
   const setStatus = (v: string[]) => (setStatusRaw(v), setPage(1));
 
   React.useEffect(() => {
@@ -243,8 +239,6 @@ function SearchPanel({ inputRef, picked, onAdd }: { inputRef: React.RefObject<HT
   }, [q]);
 
   const params = new URLSearchParams({ q: debounced, p: String(page), size: String(SEARCH_SIZE), sort: "name" });
-  if (district.length) params.set("district", serializeList(district));
-  if (chapter.length) params.set("chapter", serializeList(chapter));
   if (status.length) params.set("status", serializeList(status));
   const qs = params.toString();
   const results = useFetch(`reprint-search:${qs}`, () => api<{ rows: CardSummary[]; total: number }>(`/api/cards?${qs}`));
@@ -272,8 +266,6 @@ function SearchPanel({ inputRef, picked, onAdd }: { inputRef: React.RefObject<HT
         <Input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, chapter, district or registration ID" className="h-10 pl-9" aria-label="Search badges" />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <FacetFilter title="District" options={facets.data?.district ?? []} selected={district} onChange={setDistrict} />
-        <FacetFilter title="Chapter" options={facets.data?.chapter ?? []} selected={chapter} onChange={setChapter} />
         <FacetFilter
           title="Status"
           options={(facets.data?.status ?? []).map((s) => ({ ...s, label: FILTER_STATUS_LABELS[s.value] ?? s.value }))}

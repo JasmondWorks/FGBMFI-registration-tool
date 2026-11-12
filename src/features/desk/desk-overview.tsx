@@ -81,7 +81,34 @@ export function DeskOverview() {
         </div>
       )}
 
-      <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[1.3fr_1fr]">
+      {/* Left to right follows the actual sequence: a sheet is built, then printed and
+          confirmed. Putting "Confirm" before "Built" would read backwards. */}
+      <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[1fr_1.3fr]">
+        <div className="flex flex-col gap-8">
+          <section aria-labelledby="ready-h" className="flex flex-col gap-3">
+            <SectionHead id="ready-h" title="Built, not printed" hint="Sheets already laid out — pick up where you left off." />
+            {data.openJobs.length === 0 ? (
+              <Empty>Nothing built and waiting. New uploads print themselves once a sheet is full.</Empty>
+            ) : (
+              <ul className="divide-y rounded-md border bg-card">
+                {data.openJobs.map((j) => (
+                  <li key={j.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <span className="flex flex-col">
+                      <span className="text-sm font-medium">
+                        {j.kind === "REPRINT" ? "Reprint" : "Upload"} · {pluralize(j.readyPages, "sheet")}
+                      </span>
+                      <span className="text-xs text-muted-foreground">Started {shortTime(j.createdAt)}</span>
+                    </span>
+                    <Button size="sm" onClick={() => overlay.open("job", j.id)}>
+                      Open
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+
         <section aria-labelledby="waiting-h" className="flex flex-col gap-3">
           <SectionHead
             id="waiting-h"
@@ -115,31 +142,6 @@ export function DeskOverview() {
             </ul>
           )}
         </section>
-
-        <div className="flex flex-col gap-8">
-          <section aria-labelledby="ready-h" className="flex flex-col gap-3">
-            <SectionHead id="ready-h" title="Built, not printed" hint="Sheets already laid out — pick up where you left off." />
-            {data.openJobs.length === 0 ? (
-              <Empty>Nothing built and waiting. New uploads print themselves once a sheet is full.</Empty>
-            ) : (
-              <ul className="divide-y rounded-md border bg-card">
-                {data.openJobs.map((j) => (
-                  <li key={j.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <span className="flex flex-col">
-                      <span className="text-sm font-medium">
-                        {j.kind === "REPRINT" ? "Reprint" : "Upload"} · {pluralize(j.readyPages, "sheet")}
-                      </span>
-                      <span className="text-xs text-muted-foreground">Started {shortTime(j.createdAt)}</span>
-                    </span>
-                    <Button size="sm" onClick={() => overlay.open("job", j.id)}>
-                      Open
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
       </div>
     </div>
   );

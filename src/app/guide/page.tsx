@@ -53,10 +53,10 @@ const PAGES: PageCard[] = [
   },
   {
     href: "/reconcile",
-    label: "Reconcile",
+    label: "Verify prints",
     tag: "New",
     tone: "info",
-    body: "Catch up badges that were printed but that the system doesn't know about — printed before tracking started, or printed elsewhere.",
+    body: "Catch up badges that were printed but that the system doesn't know about — printed before tracking started, or printed elsewhere. Confirms print status only, not whether the badge reached its owner.",
     bullets: [
       "Take or choose photos of already-printed badges",
       "The app reads the name and ID off the card automatically",

@@ -316,8 +316,6 @@ export function RecordsTable() {
             aria-label="Search records"
           />
         </div>
-        <FacetFilter title="District" options={f?.district ?? []} selected={query.district} onChange={(v) => update({ district: v })} />
-        <FacetFilter title="Chapter" options={f?.chapter ?? []} selected={query.chapter} onChange={(v) => update({ chapter: v })} />
         <FacetFilter
           title="Title"
           options={(f?.title ?? []).map((t) => ({ ...t, label: t.value.charAt(0) + t.value.slice(1).toLowerCase() }))}
@@ -383,7 +381,7 @@ export function RecordsTable() {
       {activeCount > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           {query.q && <Chip label={`Search: ${query.q}`} onRemove={() => update({ q: "" })} />}
-          {(["district", "chapter", "title", "status", "printedBy"] as const).flatMap((k) =>
+          {(["title", "status", "printedBy"] as const).flatMap((k) =>
             query[k].map((v) => (
               <Chip key={`${k}:${v}`} label={`${COLUMN_LABELS[k] ?? k}: ${k === "status" ? FILTER_STATUS_LABELS[v] ?? v : v}`} onRemove={() => update({ [k]: query[k].filter((x) => x !== v) })} />
             )),

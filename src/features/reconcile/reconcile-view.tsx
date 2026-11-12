@@ -28,10 +28,12 @@ type ScanRow = { key: string; photoName: string; status: "scanning" | "done" | "
 const SCAN_CONCURRENCY = 3;
 
 /**
- * Reconcile badges that were physically handed out but that the system doesn't know were
- * printed: photograph them, OCR reads the name/ID off the card, and it's matched against
- * existing badges. Matches that aren't marked printed yet get marked now. Anything with no
- * match at all needs its file uploaded so a record exists to mark as printed.
+ * Reconcile badges that were physically printed but that the system doesn't know were
+ * printed (printed elsewhere, or before tracking started): photograph them, OCR reads the
+ * name/ID off the card, and it's matched against existing badges. Matches that aren't
+ * marked printed yet get marked now. Anything with no match at all needs its file uploaded
+ * so a record exists to mark as printed. This only tracks print status, not whether the
+ * badge has actually reached its owner.
  */
 export function ReconcileView() {
   const { requireOperator } = useOperator();
@@ -97,10 +99,11 @@ export function ReconcileView() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="text-xl font-semibold">Reconcile printed badges</h1>
+        <h1 className="text-xl font-semibold">Verify already-printed badges</h1>
         <p className="text-sm text-muted-foreground">
-          Photograph badges that have already been printed and handed out. Anything the system doesn't already show as printed gets
-          marked now.
+          For badges physically printed before the system knew about them. Photograph each one; it's matched against existing
+          records and marked printed if it wasn't already. This only confirms a badge was <strong>printed</strong> — not that it's
+          been handed to its owner.
         </p>
       </div>
 

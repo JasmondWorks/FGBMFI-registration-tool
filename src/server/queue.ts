@@ -19,16 +19,14 @@ import { UserError } from "./http";
 
 export type QueueQuery = {
   q: string;
-  district: string[];
   p: number;
   size: number;
 };
 
-function buildWhere(q: QueueQuery, skip?: "district"): SQL | undefined {
+function buildWhere(q: QueueQuery): SQL | undefined {
   const parts: (SQL | undefined)[] = [inArray(cards.status, ["UPLOADED", "WAITING_TRAY"])];
   const words = normalizeText(q.q).split(" ").filter(Boolean).slice(0, 8);
   for (const w of words) parts.push(sql`${cards.searchText} like ${"%" + w + "%"}`);
-  if (skip !== "district" && q.district.length) parts.push(inArray(cards.district, q.district));
   return and(...parts);
 }
 
@@ -45,18 +43,6 @@ export async function listQueue(q: QueueQuery) {
     .offset((q.p - 1) * q.size);
   const [{ total }] = await db.select({ total: sql<number>`count(*)` }).from(cards).where(where);
   return { rows: rows.map(toCardSummary), total: Number(total) };
-}
-
-/** District options with counts, so the filter only shows districts actually waiting in the queue. */
-export async function getQueueDistricts(q: QueueQuery) {
-  const rows = await db
-    .select({ value: cards.district, count: sql<number>`count(*)` })
-    .from(cards)
-    .where(and(buildWhere(q, "district"), sql`${cards.district} is not null and ${cards.district} <> ''`))
-    .groupBy(cards.district)
-    .orderBy(sql`count(*) desc`, cards.district)
-    .limit(300);
-  return rows.map((r) => ({ value: r.value as string, count: Number(r.count) }));
 }
 
 export async function getQueueCount() {

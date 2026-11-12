@@ -11,12 +11,13 @@ import { toCardSummary } from "./mappers";
 import { UserError } from "./http";
 
 /**
- * Reconciliation: confirm a badge has already been printed and given out, by
- * photographing the physical card instead of relying on the system's own print
- * records. Useful when badges were printed before the desk was tracking them, or
- * printed from somewhere else entirely. OCR reads what's on the card; the printed
- * ID is the most reliable match key since it's already a unique field on every
- * badge, with name as a fallback when the ID can't be read.
+ * Reconciliation: confirm a badge has already been printed, by photographing the
+ * physical card instead of relying on the system's own print records. Useful when
+ * badges were printed before the desk was tracking them, or printed from somewhere
+ * else entirely. OCR reads what's on the card; the printed ID is the most reliable
+ * match key since it's already a unique field on every badge, with name as a
+ * fallback when the ID can't be read. This confirms print status only — not that
+ * the badge has reached its owner.
  */
 
 export type ScanResult = {

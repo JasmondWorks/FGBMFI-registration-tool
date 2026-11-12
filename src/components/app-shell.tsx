@@ -22,7 +22,7 @@ const NAV = [
   { href: "/queue", label: "Queue" },
   { href: "/records", label: "Records" },
   { href: "/reprint", label: "Reprint" },
-  { href: "/reconcile", label: "Reconcile" },
+  { href: "/reconcile", label: "Verify prints" },
   { href: "/settings", label: "Settings" },
   { href: "/guide", label: "Guide" },
 ];

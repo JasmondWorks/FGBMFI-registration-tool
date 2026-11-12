@@ -17,9 +17,8 @@ import type { CardSummary, JobView } from "@/lib/types";
 import { cn, pluralize } from "@/lib/utils";
 import { useOperator } from "@/features/operator/operator-context";
 import { useOverlay } from "@/features/overlays/use-overlay";
-import { FacetFilter } from "@/features/records/facet-filter";
 
-type QueueResponse = { rows: CardSummary[]; total: number; districts: { value: string; count: number }[] };
+type QueueResponse = { rows: CardSummary[]; total: number };
 
 /**
  * Every badge uploaded anywhere that hasn't been placed on a page yet, across every
@@ -30,22 +29,19 @@ export function QueueView() {
   const overlay = useOverlay();
   const { requireOperator } = useOperator();
   const [q, setQ] = React.useState("");
-  const [district, setDistrict] = React.useState<string[]>([]);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [busy, setBusy] = React.useState(false);
 
-  const queryKey = `queue:${q}:${district.join(",")}`;
+  const queryKey = `queue:${q}`;
   const result = useFetch(queryKey, () => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
-    if (district.length) params.set("district", district.join("|"));
     params.set("size", "100");
     return api<QueueResponse>(`/api/queue?${params.toString()}`);
   });
 
   const rows = result.data?.rows ?? [];
   const total = result.data?.total ?? 0;
-  const districts = result.data?.districts ?? [];
   const selectedRows = rows.filter((r) => selected.has(r.id));
 
   // A selected badge can leave the queue on its own (printed via another tab, swept up
@@ -100,13 +96,13 @@ export function QueueView() {
     }
   }
 
-  async function buildNext(scopedDistrict?: string) {
+  async function buildNext() {
     if (!requireOperator()) return;
     setBusy(true);
     try {
       const res = await api<{ ok: boolean; needsCountFix?: boolean; jobId?: string | null; job?: JobView }>("/api/queue/build", {
         method: "POST",
-        json: { district: scopedDistrict, allowUnderfilled: true },
+        json: { allowUnderfilled: true },
       });
       emitDeskChanged();
       if (res.jobId) {
@@ -162,12 +158,6 @@ export function QueueView() {
           <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search the queue…" value={q} onChange={(e) => setQ(e.target.value)} className="pl-8" />
         </div>
-        <FacetFilter title="District" options={districts} selected={district} onChange={setDistrict} />
-        {district.length === 1 && (
-          <Button variant="outline" size="sm" onClick={() => buildNext(district[0])} disabled={busy}>
-            Build next sheet from {district[0]} only
-          </Button>
-        )}
       </div>
 
       {selectedRows.length > 0 && (

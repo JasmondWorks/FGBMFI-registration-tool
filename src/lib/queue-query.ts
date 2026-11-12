@@ -1,13 +1,7 @@
 import { z } from "zod";
 
-const list = z
-  .string()
-  .optional()
-  .transform((v) => (v ? v.split("|").filter(Boolean) : []));
-
 export const queueQuerySchema = z.object({
   q: z.string().optional().default(""),
-  district: list,
   p: z.coerce.number().int().min(1).optional().default(1),
   size: z.coerce.number().int().min(10).max(200).optional().default(50),
 });
