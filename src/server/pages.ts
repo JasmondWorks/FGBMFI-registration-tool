@@ -122,6 +122,7 @@ export async function layoutJob(jobId: string, opts: LayoutOptions, operator: st
           .where(inArray(pageItems.pageId, readyPageIds))
           .orderBy(asc(pages.pageNumber), asc(pageItems.slot))
       : [];
+    const onPageCardIds = new Set(onPages.map((r) => r.cardId));
     let queue = onPages.map((r) => r.cardId);
     if (job.kind === "UPLOAD") {
       const unplaced = await tx
@@ -151,6 +152,13 @@ export async function layoutJob(jobId: string, opts: LayoutOptions, operator: st
     const finalQueue = queue.filter((id) => !remove.has(id) && !hold.has(id) && byId.has(id));
     const blocked = finalQueue.map((id) => byId.get(id)!).find((c) => c.status === "DISCARDED" || c.status === "SUPERSEDED");
     if (blocked) throw new UserError(`${blocked.fullName}'s badge was ${blocked.status === "DISCARDED" ? "removed" : "replaced by a newer version"}`);
+    // A card already on a DIFFERENT job's unconfirmed page got there between when this
+    // request read the queue and now (two uploads/prints landing at the same moment).
+    // Block it rather than silently double-booking the same badge onto two sheets.
+    const raced = finalQueue
+      .map((id) => byId.get(id)!)
+      .find((c) => (c.status === "ON_PAGE" || c.status === "PRINT_SENT") && !onPageCardIds.has(c.id));
+    if (raced) throw new UserError(`${raced.fullName}'s badge was just placed on another sheet. Refresh and try again.`);
 
     // 3. Enforce the multiple-of-4 rule before changing anything.
     const count = checkCount(finalQueue.length);
