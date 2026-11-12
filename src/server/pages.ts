@@ -254,6 +254,46 @@ export async function swapSlots(a: { pageId: string; slot: number }, b: { pageId
   });
 }
 
+/**
+ * Puts a specific badge (picked from the queue, by search) into an exact slot: fills an
+ * empty slot, or replaces whatever was there — the replaced badge goes back to resting
+ * status, same as removing it, so it lands right back in the queue rather than vanishing.
+ */
+export async function assignSlotCard(pageId: string, slot: number, cardId: string, operator: string) {
+  await db.transaction(async (tx) => {
+    const page = await tx.query.pages.findFirst({ where: eq(pages.id, pageId) });
+    if (!page) throw new UserError("That sheet no longer exists");
+    if (page.status !== "READY") throw new UserError("Only sheets that haven't been printed can be rearranged");
+
+    const incoming = await tx.query.cards.findFirst({ where: eq(cards.id, cardId) });
+    if (!incoming) throw new UserError("That badge no longer exists");
+    if (incoming.status === "ON_PAGE" || incoming.status === "PRINT_SENT") {
+      throw new UserError(`${incoming.fullName} is already on another sheet that hasn't printed or confirmed yet.`);
+    }
+    if (incoming.status === "DISCARDED" || incoming.status === "SUPERSEDED") {
+      throw new UserError(`${incoming.fullName}'s badge was ${incoming.status === "DISCARDED" ? "removed" : "replaced by a newer version"}.`);
+    }
+
+    const existing = await tx.query.pageItems.findFirst({ where: and(eq(pageItems.pageId, pageId), eq(pageItems.slot, slot)) });
+    if (existing) {
+      if (existing.cardId === cardId) return; // already there
+      await restoreStatus(tx, [existing.cardId]);
+      await tx.update(pageItems).set({ cardId }).where(eq(pageItems.id, existing.id));
+    } else {
+      await tx.insert(pageItems).values({ pageId, cardId, slot });
+    }
+    await tx.update(cards).set({ status: "ON_PAGE", updatedAt: new Date() }).where(eq(cards.id, cardId));
+
+    const filled = await tx.select({ n: sql<number>`count(*)` }).from(pageItems).where(eq(pageItems.pageId, pageId));
+    await tx.update(pages).set({ isUnderfilled: Number(filled[0].n) < CARDS_PER_PAGE }).where(eq(pages.id, pageId));
+
+    await logEvents(
+      [{ type: "PAGE_CREATED", actor: operator, pageId, cardId, payload: { action: existing ? "slot-replaced" : "slot-filled", slot, replaced: existing?.cardId } }],
+      tx,
+    );
+  });
+}
+
 /* ------------------------------------------------------------------ */
 /* Printing lifecycle                                                  */
 /* ------------------------------------------------------------------ */

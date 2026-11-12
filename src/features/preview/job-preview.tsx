@@ -19,6 +19,7 @@ import { useOverlay } from "@/features/overlays/use-overlay";
 import { usePrint } from "@/features/print/print-provider";
 import { CountFixDialog, type LayoutBase } from "./count-fix-dialog";
 import { SheetView } from "./sheet-view";
+import { SlotAssignDialog, type SlotTarget } from "./slot-assign-dialog";
 import { SlotEditor } from "./slot-editor";
 
 type PageFilter = "all" | "ready" | "waiting" | "done";
@@ -37,6 +38,7 @@ export function JobPreview() {
   const [filter, setFilter] = React.useState<PageFilter>("all");
   const [fix, setFix] = React.useState<{ base: LayoutBase } | null>(null);
   const [showTemplate, setShowTemplate] = React.useState(true);
+  const [assignTarget, setAssignTarget] = React.useState<SlotTarget | null>(null);
   const [fixDismissedFor, setFixDismissedFor] = React.useState<string | null>(null);
   const { printPages, phase, settings, openConfirm } = usePrint();
   const intake = useIntakeContext();
@@ -316,8 +318,18 @@ export function JobPreview() {
                     const isOpen = slot === n;
                     if (!item) {
                       return (
-                        <li key={n} className="px-4 py-3 text-xs text-muted-foreground">
-                          Slot {n} is empty
+                        <li key={n}>
+                          {selected.status === "READY" ? (
+                            <button
+                              onClick={() => setAssignTarget({ pageId: selected.id, slot: n })}
+                              className="flex w-full items-center gap-2 px-4 py-3 text-left text-xs text-muted-foreground hover:bg-muted/50"
+                            >
+                              <span className="tnum flex size-5 shrink-0 items-center justify-center rounded-sm border border-dashed text-[10px]">{n}</span>
+                              Slot {n} is empty — fill from the queue
+                            </button>
+                          ) : (
+                            <span className="block px-4 py-3 text-xs text-muted-foreground">Slot {n} is empty</span>
+                          )}
                         </li>
                       );
                     }
@@ -348,6 +360,9 @@ export function JobPreview() {
                                   )}
                                   <DropdownMenuItem variant="destructive" onSelect={() => relayout({ removeCardIds: [item.card.id] })}>
                                     {job.kind === "UPLOAD" && item.card.printCount === 0 ? "Remove badge" : "Take out of this print"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => setAssignTarget({ pageId: selected.id, slot: n, current: { fullName: item.card.fullName } })}>
+                                    Replace with specific badge…
                                   </DropdownMenuItem>
                                   {otherSlots.length > 0 && (
                                     <>
@@ -405,6 +420,16 @@ export function JobPreview() {
             onAddFiles={() => setFix(null)}
           />
         )}
+
+        <SlotAssignDialog
+          target={assignTarget}
+          onClose={() => setAssignTarget(null)}
+          onAssigned={() => {
+            setAssignTarget(null);
+            emitDeskChanged();
+            void reload();
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
