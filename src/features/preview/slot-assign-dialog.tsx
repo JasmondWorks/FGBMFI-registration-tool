@@ -9,8 +9,8 @@ import { Skeleton } from "@/components/ui/misc";
 import { SearchIcon } from "@/components/icons";
 import { api, errorMessage } from "@/lib/api";
 import { useFetch } from "@/lib/events";
-import { personLabel } from "@/lib/format";
 import type { CardSummary } from "@/lib/types";
+import { BadgeList, BadgeRow } from "@/features/badges/badge-row";
 
 export type SlotTarget = { pageId: string; slot: number; current?: { fullName: string } };
 
@@ -19,9 +19,13 @@ export function SlotAssignDialog({ target, onClose, onAssigned }: { target: Slot
   const [q, setQ] = React.useState("");
   const [busy, setBusy] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
+  // Reset the search each time a different slot opens — done at render time (not in an
+  // effect) so it can't cause an extra render just to clear a field before the user sees it.
+  const [lastTarget, setLastTarget] = React.useState(target);
+  if (target !== lastTarget) {
+    setLastTarget(target);
     if (target) setQ("");
-  }, [target]);
+  }
 
   const result = useFetch(target ? `slot-assign:${q}` : null, () => {
     const params = new URLSearchParams({ size: "20" });
@@ -68,23 +72,18 @@ export function SlotAssignDialog({ target, onClose, onAssigned }: { target: Slot
             ) : rows.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">No badges waiting in the queue match that search.</p>
             ) : (
-              <ol className="divide-y rounded-md border">
+              <BadgeList as="ol">
                 {rows.map((c) => (
                   <li key={c.id}>
-                    <button
+                    <BadgeRow
+                      card={c}
                       disabled={!!busy}
                       onClick={() => pick(c.id)}
-                      className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm hover:bg-muted/50 disabled:opacity-60"
-                    >
-                      <span className="flex min-w-0 flex-col">
-                        <span className="truncate font-medium">{personLabel(c)}</span>
-                        <span className="truncate text-xs text-muted-foreground">{[c.chapter, c.district].filter(Boolean).join(" · ") || c.originalFilename}</span>
-                      </span>
-                      {busy === c.id && <span className="shrink-0 text-xs text-muted-foreground">Placing…</span>}
-                    </button>
+                      trailing={busy === c.id && <span className="shrink-0 text-xs text-muted-foreground">Placing…</span>}
+                    />
                   </li>
                 ))}
-              </ol>
+              </BadgeList>
             )}
           </div>
         </div>

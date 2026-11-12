@@ -20,6 +20,7 @@ import { checkCount, describeCount } from "@/lib/paging";
 import { serializeList } from "@/lib/records-query";
 import type { CardSummary, Facets, JobView } from "@/lib/types";
 import { cn, pluralize } from "@/lib/utils";
+import { BadgeList, BadgeRow } from "@/features/badges/badge-row";
 import { useOperator } from "@/features/operator/operator-context";
 import { useOverlay } from "@/features/overlays/use-overlay";
 import { FacetFilter } from "@/features/records/facet-filter";
@@ -280,28 +281,31 @@ function SearchPanel({ inputRef, picked, onAdd }: { inputRef: React.RefObject<HT
         )}
       </div>
 
-      <ul className="divide-y rounded-md border bg-card">
+      <BadgeList>
         {results.loading && rows.length === 0 && Array.from({ length: 6 }).map((_, i) => <li key={i} className="p-3"><Skeleton className="h-8" /></li>)}
         {!results.loading && rows.length === 0 && <li className="px-4 py-10 text-center text-sm text-muted-foreground">No badges match.</li>}
         {rows.map((c) => {
           const inList = picked.has(c.id);
           return (
-            <li key={c.id} className="flex items-center gap-3 px-4 py-2.5">
-              <Checkbox checked={inList} onCheckedChange={(v) => v && onAdd([c.id])} disabled={inList} aria-label={`Add ${c.fullName}`} />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium">{personLabel(c)}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {[c.chapter, c.district].filter(Boolean).join(" · ")} · printed {c.printCount}x{c.lastPrintedAt ? `, last ${relativeTime(c.lastPrintedAt)}` : ""}
-                </span>
-              </div>
-              <Badge variant={CARD_STATUS[c.status].tone}>{CARD_STATUS[c.status].label}</Badge>
-              <Button size="sm" variant={inList ? "ghost" : "outline"} disabled={inList} onClick={() => onAdd([c.id])}>
-                {inList ? "Added" : "Add"}
-              </Button>
+            <li key={c.id}>
+              <BadgeRow
+                card={c}
+                selected={inList}
+                onToggle={() => !inList && onAdd([c.id])}
+                subtitle={`${[c.chapter, c.district].filter(Boolean).join(" · ")} · printed ${c.printCount}x${c.lastPrintedAt ? `, last ${relativeTime(c.lastPrintedAt)}` : ""}`}
+                trailing={
+                  <>
+                    <Badge variant={CARD_STATUS[c.status].tone}>{CARD_STATUS[c.status].label}</Badge>
+                    <Button size="sm" variant={inList ? "ghost" : "outline"} disabled={inList} onClick={() => onAdd([c.id])}>
+                      {inList ? "Added" : "Add"}
+                    </Button>
+                  </>
+                }
+              />
             </li>
           );
         })}
-      </ul>
+      </BadgeList>
       {total > SEARCH_SIZE && (
         <div className="flex items-center justify-end gap-2 text-sm">
           <span className="tnum text-muted-foreground">

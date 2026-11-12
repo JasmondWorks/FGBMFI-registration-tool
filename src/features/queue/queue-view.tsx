@@ -5,16 +5,16 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/misc";
 import { SearchIcon } from "@/components/icons";
 import { api, errorMessage } from "@/lib/api";
 import { emitDeskChanged, useFetch } from "@/lib/events";
-import { personLabel, relativeTime } from "@/lib/format";
+import { relativeTime } from "@/lib/format";
 import { CARDS_PER_PAGE, checkCount, describeCount } from "@/lib/paging";
 import type { CardSummary, JobView } from "@/lib/types";
 import { cn, pluralize } from "@/lib/utils";
+import { BadgeList, BadgeRow } from "@/features/badges/badge-row";
 import { useOperator } from "@/features/operator/operator-context";
 import { useOverlay } from "@/features/overlays/use-overlay";
 
@@ -42,20 +42,11 @@ export function QueueView() {
 
   const rows = result.data?.rows ?? [];
   const total = result.data?.total ?? 0;
+  // A selected badge can leave the queue on its own (printed via another tab, swept up by
+  // an upload's auto-build, etc). Filtering against the current rows here — rather than
+  // pruning the `selected` Set itself — means "N selected" never claims more than what's
+  // actually still there, without needing an effect just to keep state in sync with props.
   const selectedRows = rows.filter((r) => selected.has(r.id));
-
-  // A selected badge can leave the queue on its own (printed via another tab, swept up
-  // by an upload's auto-build, etc). Drop it from the selection once it's no longer in
-  // the list, so "N selected" never claims more than what's actually still there.
-  const rowIds = result.data ? rows.map((r) => r.id).join(",") : null;
-  React.useEffect(() => {
-    if (rowIds === null) return;
-    const present = new Set(rowIds ? rowIds.split(",") : []);
-    setSelected((prev) => {
-      const next = new Set([...prev].filter((id) => present.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [rowIds]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -191,28 +182,31 @@ export function QueueView() {
           {total === 0 ? "The queue is empty. Uploads land here automatically." : "No badges match this search."}
         </div>
       ) : (
-        <ol className="divide-y rounded-lg border">
+        <BadgeList as="ol">
           {rows.map((c, i) => (
-            <li key={c.id} className="flex items-center gap-3 p-3">
-              <span className="tnum w-6 shrink-0 text-right text-xs text-muted-foreground">{i + 1}</span>
-              <Checkbox checked={selected.has(c.id)} onCheckedChange={() => toggle(c.id)} aria-label={`Select ${personLabel(c)}`} />
-              <button className="flex min-w-0 flex-1 flex-col text-left" onClick={() => overlay.open("view", c.id)}>
-                <span className="truncate text-sm font-medium">{personLabel(c)}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {[c.chapter, c.district].filter(Boolean).join(" · ") || c.originalFilename}
-                </span>
-              </button>
-              {c.needsReview && <Badge variant="warning">Check</Badge>}
-              {c.status === "WAITING_TRAY" && <Badge variant="outline">Tray</Badge>}
-              <span className="tnum shrink-0 text-xs text-muted-foreground">{relativeTime(c.createdAt)}</span>
+            <li key={c.id}>
+              <BadgeRow
+                card={c}
+                index={i + 1}
+                selected={selected.has(c.id)}
+                onToggle={() => toggle(c.id)}
+                onClick={() => overlay.open("view", c.id)}
+                trailing={
+                  <>
+                    {c.needsReview && <Badge variant="warning">Check</Badge>}
+                    {c.status === "WAITING_TRAY" && <Badge variant="outline">Tray</Badge>}
+                    <span className="tnum shrink-0 text-xs text-muted-foreground">{relativeTime(c.createdAt)}</span>
+                  </>
+                }
+              />
             </li>
           ))}
-        </ol>
+        </BadgeList>
       )}
       {selectedRows.length === 0 && rows.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          Search and select any badges: "Move to front" prioritizes them and prints right away if that completes a sheet, or "Print
-          selected now" to print exactly that pick immediately regardless of order.
+          Search and select any badges: &ldquo;Move to front&rdquo; prioritizes them and prints right away if that completes a
+          sheet, or &ldquo;Print selected now&rdquo; to print exactly that pick immediately regardless of order.
         </p>
       )}
     </div>
