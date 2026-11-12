@@ -4,13 +4,25 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/api";
-import { useFetch } from "@/lib/events";
+import { api, errorMessage } from "@/lib/api";
+import { emitDeskChanged, useFetch } from "@/lib/events";
+import { useOperator } from "@/features/operator/operator-context";
 import { AUDIT_LABELS, CARD_STATUS, exactTime, PAGE_STATUS, personLabel, relativeTime } from "@/lib/format";
 import type { AuditEntry, CardDetail } from "@/lib/types";
 import { BadgeImage, cardFileUrl } from "@/features/pdf/pdf-render";
@@ -26,10 +38,12 @@ import { addToReprintDraft, getReprintDraft, setReprintDraft } from "@/features/
 export function BadgeViewer() {
   const overlay = useOverlay();
   const router = useRouter();
+  const { requireOperator } = useOperator();
   const id = overlay.view;
   const { data, error, reload } = useFetch(id ? `card:${id}` : null, () => api<CardDetail>(`/api/cards/${id}`));
   const card = data && data.id === id ? data : null;
   const [onCard, setOnCard] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const [shownId, setShownId] = React.useState(id);
   if (id !== shownId) {
@@ -42,6 +56,21 @@ export function BadgeViewer() {
     setReprintDraft({ cardIds: [card.id] });
     overlay.close("view");
     router.push("/reprint");
+  }
+
+  async function deleteBadge() {
+    if (!card || !requireOperator()) return;
+    setDeleting(true);
+    try {
+      await api(`/api/cards/${card.id}`, { method: "DELETE" });
+      emitDeskChanged();
+      toast.success(`${card.fullName}'s badge was deleted`);
+      overlay.close("view");
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setDeleting(false);
+    }
   }
   function addToList() {
     if (!card) return;
@@ -115,6 +144,30 @@ export function BadgeViewer() {
                 <Button variant="link" size="sm" onClick={() => overlay.open("view", card.supersedes!.id)}>
                   Open the badge this replaced
                 </Button>
+              )}
+              {card.status !== "DISCARDED" && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                      Delete this badge
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete {card.fullName}&apos;s badge?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        For a wrong upload, duplicate, or typo&apos;d entry. It's removed from search, the queue, and duplicate
+                        checks, but stays in the audit trail. This can't be undone from here — ask an admin if you need it back.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction disabled={deleting} onClick={deleteBadge} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        {deleting ? "Deleting..." : "Delete badge"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
 

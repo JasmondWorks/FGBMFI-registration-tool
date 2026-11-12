@@ -17,7 +17,7 @@ import { Skeleton, Tooltip, TooltipContent, TooltipTrigger } from "@/components/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronDownIcon, ChevronUpIcon, CloseIcon, MoreIcon, SearchIcon, SortIcon } from "@/components/icons";
 import { api, errorMessage } from "@/lib/api";
-import { useFetch } from "@/lib/events";
+import { emitDeskChanged, useFetch } from "@/lib/events";
 import { CARD_STATUS, exactTime, FILTER_STATUS_LABELS, relativeTime, shortTime } from "@/lib/format";
 import type { RecordsQuery } from "@/lib/records-query";
 import type { CardSummary, Facets } from "@/lib/types";
@@ -222,6 +222,26 @@ export function RecordsTable() {
               >
                 Copy filename
               </DropdownMenuItem>
+              {row.original.status !== "DISCARDED" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={async () => {
+                      if (!window.confirm(`Delete ${row.original.fullName}'s badge? For a wrong upload or typo'd entry; it stays in the audit trail.`)) return;
+                      try {
+                        await api(`/api/cards/${row.original.id}`, { method: "DELETE" });
+                        emitDeskChanged();
+                        toast.success(`${row.original.fullName}'s badge was deleted`);
+                      } catch (err) {
+                        toast.error(errorMessage(err));
+                      }
+                    }}
+                  >
+                    Delete badge
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         ),

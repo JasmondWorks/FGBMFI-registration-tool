@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { getCardDetail, logViewed, updateCard } from "@/server/cards";
+import { deleteCard, getCardDetail, logViewed, updateCard } from "@/server/cards";
 import { handle, ok, parseJson, requireOperator } from "@/server/http";
 
 export const GET = handle(async (req: Request, ctx: RouteContext<"/api/cards/[id]">) => {
@@ -25,4 +25,10 @@ export const PATCH = handle(async (req: Request, ctx: RouteContext<"/api/cards/[
   const operator = requireOperator(req);
   const { id } = await ctx.params;
   return ok(await updateCard(id, await parseJson(req, editSchema), operator));
+});
+
+export const DELETE = handle(async (req: Request, ctx: RouteContext<"/api/cards/[id]">) => {
+  const operator = requireOperator(req);
+  const { id } = await ctx.params;
+  return ok(await deleteCard(id, operator));
 });

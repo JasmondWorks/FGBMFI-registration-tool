@@ -272,6 +272,27 @@ export async function updateCard(id: string, edit: CardEdit, operator: string) {
   return toCardSummary(updated);
 }
 
+/**
+ * Removes a badge created by mistake (wrong file, duplicate that slipped through, typo'd
+ * upload). Soft delete, same as every other removal path in the app: the record and its
+ * history stay for the audit trail, just excluded from search, the queue and dedup checks.
+ */
+export async function deleteCard(id: string, operator: string) {
+  const card = await db.query.cards.findFirst({ where: eq(cards.id, id) });
+  if (!card) throw new UserError("Badge not found", 404);
+  if (card.status === "DISCARDED") return toCardSummary(card);
+  if (card.status === "ON_PAGE" || card.status === "PRINT_SENT") {
+    throw new UserError(`${card.fullName} is on a sheet that hasn't been printed or confirmed yet. Remove it from that sheet first.`);
+  }
+  const [updated] = await db
+    .update(cards)
+    .set({ status: "DISCARDED", updatedAt: new Date() })
+    .where(eq(cards.id, id))
+    .returning();
+  await logEvent({ type: "DISCARDED", actor: operator, cardId: id, payload: { fullName: card.fullName, reason: "Deleted by operator" } });
+  return toCardSummary(updated);
+}
+
 /** Log that someone opened a badge, at most once per operator per 10 minutes. */
 export async function logViewed(cardId: string, operator: string) {
   const recent = await db
