@@ -8,7 +8,7 @@ type PageCard = { href: string; label: string; tag: string; tone: "default" | "s
 const FLOW: Step[] = [
   { n: 1, title: "Upload", body: "Drop badge PDFs on the home page. Each one is read automatically and checked for duplicates." },
   { n: 2, title: "Queue", body: "New badges land in one shared queue — everyone's uploads, across the whole desk. Nothing prints until a full sheet of 4 is ready." },
-  { n: 3, title: "Auto-print", body: "The moment the queue has 4 or more, a sheet builds itself and the print preview opens — no extra steps for a clean batch." },
+  { n: 3, title: "Auto-print", body: "The moment the queue has 4 or more, a sheet builds itself and the print preview opens — no extra steps for a clean batch. Need specific names first? Search, select, and print or prioritize them from the Queue page." },
   { n: 4, title: "Confirm", body: "After printing, you're asked which badges actually came out. Only confirmed badges are marked printed." },
   { n: 5, title: "Records", body: "Every badge's full history lives on the Records page: printed, reprinted, by whom, when." },
 ];
@@ -31,8 +31,8 @@ const PAGES: PageCard[] = [
     bullets: [
       "Search and filter by district",
       "\"Build next sheet\" pulls the oldest 4 in line",
-      "Select any 4 yourself and \"Print selected now\" to jump the queue",
-      "\"Move to front\" to prioritize specific badges",
+      "Search for specific names, select them, and \"Move to front\" — prioritizes them and prints immediately if that completes a sheet",
+      "\"Print selected now\" prints an exact hand-picked set right away, any count, any order — offers to print underfilled rather than forcing a round number",
     ],
   },
   {
@@ -69,7 +69,12 @@ const PAGES: PageCard[] = [
     tag: "Setup",
     tone: "secondary",
     body: "Printer choice and the alignment numbers that keep names landing in the right spot on the pre-printed cards.",
-    bullets: ["Print a calibration sheet on plain paper to check alignment", "Separate offset for the bottom row if your printer drifts", "Danger zone: wipe all test data before the real event"],
+    bullets: [
+      "Print a calibration sheet on plain paper to check alignment",
+      "Separate offset for the bottom row if your printer drifts",
+      "When printing multiple sheets, you'll be reminded to check \"two-sided\" is off — these cards are single-sided stock",
+      "Danger zone: wipe all test data before the real event",
+    ],
   },
 ];
 
@@ -171,7 +176,12 @@ export default function GuidePage() {
           <li>Pick who's at the desk from the top-right corner before uploading or printing — it's logged against every action.</li>
           <li>A sheet is always 4 badges. If a batch doesn't divide evenly, you'll be offered to add more, remove some, or hold the extras in the tray.</li>
           <li>The app never marks a badge printed on its own — you always confirm what actually came out of the printer.</li>
-          <li>Testing things out? Settings → Danger zone clears all data so you can start clean before the real event.</li>
+          <li>
+            Printing more than one sheet from the browser: make sure "Two-sided printing" is off in the print dialog that opens, or
+            sheet 2 will print on the back of sheet 1's single-sided card stock instead of its own sheet.
+          </li>
+          <li>Works on a phone or tablet too — the menu collapses behind the ☰ button at the top on a narrow screen.</li>
+          <li>Testing things out? Settings → Danger zone (type &ldquo;DELETE EVERYTHING&rdquo; to confirm) clears all data so you can start clean before the real event.</li>
         </ul>
       </section>
     </div>
