@@ -57,16 +57,23 @@ export function QueueView() {
     });
   }
 
-  async function printSelected() {
+  async function printSelected(allowUnderfilled = false) {
     if (!requireOperator()) return;
     setBusy(true);
     try {
-      const res = await api<{ ok: boolean; needsCountFix?: boolean; jobId?: string | null; job?: JobView }>("/api/queue/build", {
-        method: "POST",
-        json: { cardIds: [...selected] },
-      });
+      const res = await api<{ ok: boolean; needsCountFix?: boolean; missing?: number; jobId?: string | null; job?: JobView }>(
+        "/api/queue/build",
+        { method: "POST", json: { cardIds: [...selected], allowUnderfilled } },
+      );
       if (res.needsCountFix) {
-        toast.error("That's not a multiple of 4", { description: "Add or remove a badge, or let it print underfilled from the page preview." });
+        // A deliberately hand-picked list (e.g. specific priority names from a search)
+        // doesn't need the usual "round up to 4" friction — offer to just print the last
+        // sheet with empty slots instead of blocking.
+        const ok = window.confirm(
+          `${selected.size} badges picked — the last sheet will have ${res.missing} blank slot${res.missing === 1 ? "" : "s"}. Print it anyway?`,
+        );
+        if (ok) return printSelected(true);
+        toast.message("Not printed", { description: "Add or remove a badge to make it a multiple of 4, or try again to print underfilled." });
         return;
       }
       setSelected(new Set());
@@ -154,7 +161,7 @@ export function QueueView() {
             <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>
               Clear
             </Button>
-            <Button size="sm" onClick={printSelected} disabled={busy}>
+            <Button size="sm" onClick={() => printSelected()} disabled={busy}>
               Print selected now
             </Button>
           </div>
