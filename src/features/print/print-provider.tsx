@@ -149,7 +149,7 @@ export function PrintProvider({ children }: { children: React.ReactNode }) {
         // The browser can't tell us what came out of the printer, so we ask.
         toast.message("Collect the sheets from the printer", {
           description: "You'll be asked to confirm which badges printed.",
-          action: { label: "Check now", onClick: () => openConfirm(pageIds) },
+          action: { label: "Confirm now", onClick: () => openConfirm(pageIds) },
           duration: current.confirmDelaySec * 1000,
         });
         timer.current = window.setTimeout(() => setConfirmIds(pageIds), current.confirmDelaySec * 1000);

@@ -83,19 +83,23 @@ export function DeskOverview() {
 
       <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[1.3fr_1fr]">
         <section aria-labelledby="waiting-h" className="flex flex-col gap-3">
-          <SectionHead id="waiting-h" title="Waiting for your check" hint="Sheets sent to the printer that nobody has confirmed yet.">
+          <SectionHead
+            id="waiting-h"
+            title="Confirm what printed"
+            hint="Sent to the printer, but nobody's said yet whether these badges actually came out right."
+          >
             {data.waiting.length > 0 && (
               <Button size="sm" onClick={() => openConfirm(data.waiting.map((p) => p.id))}>
-                Check all {data.waiting.length}
+                Confirm all {data.waiting.length}
               </Button>
             )}
           </SectionHead>
           {data.waiting.length === 0 ? (
-            <Empty>Nothing waiting. Every printed sheet has been checked.</Empty>
+            <Empty>Nothing to confirm. Every printed sheet's been checked against what came out.</Empty>
           ) : (
             <ul className="divide-y rounded-md border bg-card">
               {data.waiting.map((p) => (
-                <PageRow key={p.id} page={p} onOpen={() => overlay.open("page", p.id)} action={<Button size="sm" variant="outline" onClick={() => openConfirm([p.id])}>Check</Button>} />
+                <PageRow key={p.id} page={p} onOpen={() => overlay.open("page", p.id)} action={<Button size="sm" variant="outline" onClick={() => openConfirm([p.id])}>Confirm</Button>} />
               ))}
             </ul>
           )}
