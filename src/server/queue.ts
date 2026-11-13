@@ -217,7 +217,22 @@ export async function buildAllFromQueue(operator: string) {
     .limit(fullSheets * CARDS_PER_PAGE);
   const ids = rows.map((r) => r.id);
 
-  const [job] = await db.insert(jobs).values({ kind: "QUEUE", operator }).returning();
-  const result = await layoutJob(job.id, { addCardIds: ids, order: ids }, operator);
+  // Reuse the one job that's still waiting on the printer rather than always starting a
+  // new one — otherwise every batch of 4 spawns its own job and "Built, not printed"
+  // sprawls into a pile of small jobs instead of reading as one real queue. "Open" means
+  // it still has a page nobody's sent yet; once every page in a job has gone to print,
+  // the next batch starts a fresh one. layoutJob already appends addCardIds after a job's
+  // existing READY pages in their current order, so leaving `order` unset here is what
+  // keeps already-built sheets ahead of the new ones — passing it would re-sort the
+  // whole thing and push the already-waiting sheets behind the new arrivals.
+  const openJob = await db.execute<{ id: string }>(sql`
+    select j.id from ${jobs} j
+    where j.kind = 'QUEUE' and exists (select 1 from ${pages} p where p.job_id = j.id and p.status = 'READY')
+    order by j.created_at asc
+    limit 1
+  `);
+  const jobId = openJob.rows[0]?.id ?? (await db.insert(jobs).values({ kind: "QUEUE", operator }).returning())[0].id;
+
+  const result = await layoutJob(jobId, { addCardIds: ids }, operator);
   return { built: true as const, queueTotal: total, remainder: total - ids.length, ...result };
 }
