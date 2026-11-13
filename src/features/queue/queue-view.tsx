@@ -188,22 +188,32 @@ export function QueueView() {
       ) : (
         <BadgeList as="ol">
           {rows.map((c, i) => (
-            <li key={c.id}>
-              <BadgeRow
-                card={c}
-                index={i + 1}
-                selected={selected.has(c.id)}
-                onToggle={() => toggle(c.id)}
-                onClick={() => overlay.open("view", c.id)}
-                trailing={
-                  <>
-                    {c.needsReview && <Badge variant="warning">Check</Badge>}
-                    {c.status === "WAITING_TRAY" && <Badge variant="outline">Tray</Badge>}
-                    <span className="tnum shrink-0 text-xs text-muted-foreground">{relativeTime(c.createdAt)}</span>
-                  </>
-                }
-              />
-            </li>
+            <React.Fragment key={c.id}>
+              {/* A boundary every 4 — this is the actual order sheets build in, not a
+                  flat list of individual badges. Only meaningful in upload order, so
+                  skip it while a search is narrowing the list to arbitrary matches. */}
+              {!q.trim() && i % CARDS_PER_PAGE === 0 && (
+                <li className="bg-muted/40 px-4 py-1.5 text-[11px] font-medium tracking-[0.04em] text-muted-foreground uppercase">
+                  {i / CARDS_PER_PAGE === 0 ? "Next sheet to build" : `Sheet ${i / CARDS_PER_PAGE + 1} after that`}
+                </li>
+              )}
+              <li>
+                <BadgeRow
+                  card={c}
+                  index={i + 1}
+                  selected={selected.has(c.id)}
+                  onToggle={() => toggle(c.id)}
+                  onClick={() => overlay.open("view", c.id)}
+                  trailing={
+                    <>
+                      {c.needsReview && <Badge variant="warning">Check</Badge>}
+                      {c.status === "WAITING_TRAY" && <Badge variant="outline">Tray</Badge>}
+                      <span className="tnum shrink-0 text-xs text-muted-foreground">{relativeTime(c.createdAt)}</span>
+                    </>
+                  }
+                />
+              </li>
+            </React.Fragment>
           ))}
         </BadgeList>
       )}
