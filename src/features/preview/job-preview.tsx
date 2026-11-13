@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/misc";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { api, errorMessage } from "@/lib/api";
 import { emitDeskChanged, useFetch } from "@/lib/events";
 import { CARD_STATUS, PAGE_STATUS, personLabel, shortTime } from "@/lib/format";
@@ -45,6 +46,7 @@ export function JobPreview() {
   const job = fetched && fetched.id === jobId ? fetched : null;
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [slot, setSlot] = React.useState<number | null>(1);
+  const [slotsOpen, setSlotsOpen] = React.useState(false);
   const [filter, setFilter] = React.useState<PageFilter>("all");
   const [fix, setFix] = React.useState<{ base: LayoutBase } | null>(null);
   const [showTemplate, setShowTemplate] = React.useState(true);
@@ -174,6 +176,98 @@ export function JobPreview() {
   }
 
   const title = job ? (job.kind === "REPRINT" ? `Reprint: ${job.reason ?? "no reason"}` : `Upload by ${job.operator}`) : "Print preview";
+
+  // Built once, shown in two places: the always-visible sidebar on wide screens, and a
+  // drawer on narrow ones (see below) — same content, not duplicated markup.
+  const slotsPanel = selected ? (
+    <ol className="divide-y">
+      {[1, 2, 3, 4].map((n) => {
+        const item = selected.items.find((i) => i.slot === n);
+        const isOpen = slot === n;
+        if (!item) {
+          return (
+            <li key={n}>
+              {selected.status === "READY" ? (
+                <button
+                  onClick={() => setAssignTarget({ pageId: selected.id, slot: n })}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-xs text-muted-foreground hover:bg-muted/50"
+                >
+                  <span className="tnum flex size-5 shrink-0 items-center justify-center rounded-sm border border-dashed text-[10px]">{n}</span>
+                  Slot {n} is empty — fill from the queue
+                </button>
+              ) : (
+                <span className="block px-4 py-3 text-xs text-muted-foreground">Slot {n} is empty</span>
+              )}
+            </li>
+          );
+        }
+        const editable = selected.status === "READY";
+        const otherSlots = pages
+          .filter((p) => p.status === "READY")
+          .flatMap((p) => p.items.filter((i) => !(p.id === selected.id && i.slot === n)).map((i) => ({ page: p, item: i })));
+        return (
+          <li key={n} className={cn(isOpen && "bg-accent/30")}>
+            <div className="flex items-center gap-2 px-4 pt-3">
+              <button onClick={() => setSlot(isOpen ? null : n)} className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none" aria-expanded={isOpen}>
+                <span className="tnum flex size-5 shrink-0 items-center justify-center rounded-sm bg-foreground/85 text-[10px] font-medium text-background">{n}</span>
+                <span className="truncate text-sm font-medium">{personLabel(item.card)}</span>
+              </button>
+              {item.card.needsReview && <Badge variant="warning">Check</Badge>}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${item.card.fullName}`}>
+                    <MoreIcon />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="max-h-80 w-64 overflow-y-auto">
+                  <DropdownMenuItem onSelect={() => overlay.open("view", item.card.id)}>Open badge</DropdownMenuItem>
+                  {editable && (
+                    <>
+                      {job!.kind === "UPLOAD" && item.card.printCount === 0 && (
+                        <DropdownMenuItem onSelect={() => relayout({ holdCardIds: [item.card.id] })}>Hold in waiting tray</DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem variant="destructive" onSelect={() => relayout({ removeCardIds: [item.card.id] })}>
+                        {job!.kind === "UPLOAD" && item.card.printCount === 0 ? "Remove badge" : "Take out of this print"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setAssignTarget({ pageId: selected.id, slot: n, current: { fullName: item.card.fullName } })}>
+                        Replace with specific badge…
+                      </DropdownMenuItem>
+                      {otherSlots.length > 0 && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel>Swap with</DropdownMenuLabel>
+                          {otherSlots.slice(0, 40).map(({ page, item: other }) => (
+                            <DropdownMenuItem key={other.itemId} onSelect={() => swap(selected, n, page.id, other.slot)}>
+                              <span className="tnum text-xs text-muted-foreground">
+                                S{page.pageNumber}·{other.slot}
+                              </span>
+                              <span className="truncate">{other.card.fullName}</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </>
+                      )}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <p className="truncate px-4 pt-0.5 pb-3 pl-11 text-xs text-muted-foreground">
+              {[item.card.chapter, item.card.district].filter(Boolean).join(" · ") || "No chapter"} ·{" "}
+              {CARD_STATUS[item.card.status].label}
+              {item.card.printCount > 0 ? ` ${item.card.printCount}x` : ""}
+            </p>
+            {isOpen && (
+              <div className="px-4 pb-4 pl-11">
+                <SlotEditor card={item.card} onSaved={() => reload()} />
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  ) : (
+    <p className="p-4 text-xs text-muted-foreground">Select a sheet.</p>
+  );
 
   return (
     <Dialog open={!!jobId} onOpenChange={(o) => !o && overlay.close("job")}>
@@ -367,100 +461,30 @@ export function JobPreview() {
               )}
             </section>
 
-            {/* Slots */}
-            <aside className="hidden min-h-0 flex-col overflow-y-auto border-l xl:flex">
-              {selected ? (
-                <ol className="divide-y">
-                  {[1, 2, 3, 4].map((n) => {
-                    const item = selected.items.find((i) => i.slot === n);
-                    const isOpen = slot === n;
-                    if (!item) {
-                      return (
-                        <li key={n}>
-                          {selected.status === "READY" ? (
-                            <button
-                              onClick={() => setAssignTarget({ pageId: selected.id, slot: n })}
-                              className="flex w-full items-center gap-2 px-4 py-3 text-left text-xs text-muted-foreground hover:bg-muted/50"
-                            >
-                              <span className="tnum flex size-5 shrink-0 items-center justify-center rounded-sm border border-dashed text-[10px]">{n}</span>
-                              Slot {n} is empty — fill from the queue
-                            </button>
-                          ) : (
-                            <span className="block px-4 py-3 text-xs text-muted-foreground">Slot {n} is empty</span>
-                          )}
-                        </li>
-                      );
-                    }
-                    const editable = selected.status === "READY";
-                    const otherSlots = pages
-                      .filter((p) => p.status === "READY")
-                      .flatMap((p) => p.items.filter((i) => !(p.id === selected.id && i.slot === n)).map((i) => ({ page: p, item: i })));
-                    return (
-                      <li key={n} className={cn(isOpen && "bg-accent/30")}>
-                        <div className="flex items-center gap-2 px-4 pt-3">
-                          <button onClick={() => setSlot(isOpen ? null : n)} className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none" aria-expanded={isOpen}>
-                            <span className="tnum flex size-5 shrink-0 items-center justify-center rounded-sm bg-foreground/85 text-[10px] font-medium text-background">{n}</span>
-                            <span className="truncate text-sm font-medium">{personLabel(item.card)}</span>
-                          </button>
-                          {item.card.needsReview && <Badge variant="warning">Check</Badge>}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${item.card.fullName}`}>
-                                <MoreIcon />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="max-h-80 w-64 overflow-y-auto">
-                              <DropdownMenuItem onSelect={() => overlay.open("view", item.card.id)}>Open badge</DropdownMenuItem>
-                              {editable && (
-                                <>
-                                  {job.kind === "UPLOAD" && item.card.printCount === 0 && (
-                                    <DropdownMenuItem onSelect={() => relayout({ holdCardIds: [item.card.id] })}>Hold in waiting tray</DropdownMenuItem>
-                                  )}
-                                  <DropdownMenuItem variant="destructive" onSelect={() => relayout({ removeCardIds: [item.card.id] })}>
-                                    {job.kind === "UPLOAD" && item.card.printCount === 0 ? "Remove badge" : "Take out of this print"}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onSelect={() => setAssignTarget({ pageId: selected.id, slot: n, current: { fullName: item.card.fullName } })}>
-                                    Replace with specific badge…
-                                  </DropdownMenuItem>
-                                  {otherSlots.length > 0 && (
-                                    <>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuLabel>Swap with</DropdownMenuLabel>
-                                      {otherSlots.slice(0, 40).map(({ page, item: other }) => (
-                                        <DropdownMenuItem key={other.itemId} onSelect={() => swap(selected, n, page.id, other.slot)}>
-                                          <span className="tnum text-xs text-muted-foreground">
-                                            S{page.pageNumber}·{other.slot}
-                                          </span>
-                                          <span className="truncate">{other.card.fullName}</span>
-                                        </DropdownMenuItem>
-                                      ))}
-                                    </>
-                                  )}
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <p className="truncate px-4 pt-0.5 pb-3 pl-11 text-xs text-muted-foreground">
-                          {[item.card.chapter, item.card.district].filter(Boolean).join(" · ") || "No chapter"} ·{" "}
-                          {CARD_STATUS[item.card.status].label}
-                          {item.card.printCount > 0 ? ` ${item.card.printCount}x` : ""}
-                        </p>
-                        {isOpen && (
-                          <div className="px-4 pb-4 pl-11">
-                            <SlotEditor card={item.card} onSaved={() => reload()} />
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
-              ) : (
-                <p className="p-4 text-xs text-muted-foreground">Select a sheet.</p>
-              )}
-            </aside>
+            {/* Slots: always-visible sidebar on wide screens. Below that, there's no room
+                for a third column, so the same content moves into a drawer instead of
+                just disappearing — this held the only way to remove/reassign/swap a
+                badge, with no fallback, on anything narrower than 1280px. */}
+            <aside className="hidden min-h-0 flex-col overflow-y-auto border-l xl:flex">{slotsPanel}</aside>
           </div>
         )}
+
+        {selected && (
+          <div className="border-t px-4 py-2 xl:hidden">
+            <Button variant="outline" size="sm" className="w-full" onClick={() => setSlotsOpen(true)}>
+              Edit slots
+            </Button>
+          </div>
+        )}
+
+        <Sheet open={slotsOpen} onOpenChange={setSlotsOpen}>
+          <SheetContent side="bottom" className="max-h-[80dvh] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Sheet {selected?.pageNumber} slots</SheetTitle>
+            </SheetHeader>
+            {slotsPanel}
+          </SheetContent>
+        </Sheet>
 
         {job && fixState && (
           <CountFixDialog

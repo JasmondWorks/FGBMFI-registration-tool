@@ -15,16 +15,17 @@ function SheetContent({
   children,
   side = "right",
   ...props
-}: React.ComponentProps<typeof SheetPrimitive.Content> & { side?: "right" | "left" }) {
+}: React.ComponentProps<typeof SheetPrimitive.Content> & { side?: "right" | "left" | "bottom" }) {
   return (
     <SheetPrimitive.Portal>
       <SheetPrimitive.Overlay className="fixed inset-0 z-50 bg-[oklch(0.2_0.01_60/0.35)]" />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed inset-y-0 z-50 flex h-full flex-col bg-card shadow-2xl outline-none",
-          side === "right" ? "right-0 border-l" : "left-0 border-r",
-          "w-full sm:max-w-md",
+          "fixed z-50 flex flex-col bg-card shadow-2xl outline-none",
+          side === "bottom" ? "inset-x-0 bottom-0 h-auto max-h-[85dvh] rounded-t-lg border-t" : "inset-y-0 h-full w-full sm:max-w-md",
+          side === "right" && "right-0 border-l",
+          side === "left" && "left-0 border-r",
           className,
         )}
         {...props}
