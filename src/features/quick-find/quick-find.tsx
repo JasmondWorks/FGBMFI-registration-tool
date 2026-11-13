@@ -59,11 +59,11 @@ export function QuickFind() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Find a badge"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-xs transition-colors hover:border-input focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none sm:w-full sm:max-w-72 sm:justify-start sm:gap-2 sm:px-3"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-xs transition-colors hover:border-input focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none min-[1100px]:w-full min-[1100px]:max-w-72 min-[1100px]:justify-start min-[1100px]:gap-2 min-[1100px]:px-3"
       >
         <SearchIcon />
-        <span className="hidden flex-1 text-left sm:inline">Find a badge</span>
-        <span className="hidden sm:inline">
+        <span className="hidden flex-1 text-left min-[1100px]:inline">Find a badge</span>
+        <span className="hidden min-[1100px]:inline">
           <Kbd>Ctrl K</Kbd>
         </span>
       </button>

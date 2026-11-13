@@ -97,28 +97,37 @@ function TopBar({ mode }: { mode: DeskMode }) {
 
   return (
     <header className="sticky top-0 z-30 border-b bg-background/92 backdrop-blur-[2px]">
-      <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-3 sm:gap-6 sm:px-5">
-        <button
-          type="button"
-          onClick={() => setNavOpen(true)}
-          data-tour="tour-hamburger"
-          className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none min-[900px]:hidden"
-          aria-label="Open menu"
+      {/* Three real regions, not one flat row fighting over space: a fixed-width left
+          (menu + logo) and right (actions) cluster that never shrink, with the nav in
+          between given the leftover space — and permission to scroll itself horizontally
+          rather than ever overlapping its neighbors if that leftover space runs out. */}
+      <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-3 sm:gap-4 sm:px-5">
+        <div className="flex shrink-0 items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setNavOpen(true)}
+            data-tour="tour-hamburger"
+            className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none min-[900px]:hidden"
+            aria-label="Open menu"
+          >
+            <MenuIcon className="size-5" />
+          </button>
+
+          <Link href="/" className="flex min-w-0 shrink items-center gap-2.5 focus-visible:outline-none">
+            <Wordmark compact />
+          </Link>
+        </div>
+
+        <nav
+          aria-label="Main"
+          className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto min-[900px]:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          <MenuIcon className="size-5" />
-        </button>
-
-        <Link href="/" className="flex min-w-0 shrink items-center gap-2.5 focus-visible:outline-none">
-          <Wordmark compact />
-        </Link>
-
-        <nav aria-label="Main" className="hidden min-w-0 items-center gap-0.5 min-[900px]:flex">
           {nav.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} />
           ))}
         </nav>
 
-        <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5 sm:gap-3">
+        <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5 sm:gap-2.5">
           {mode === "printer" && <UnconfirmedIndicator />}
           <div className="hidden min-[900px]:block">
             <ModeSwitcher />
