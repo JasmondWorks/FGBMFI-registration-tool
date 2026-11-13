@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { useFetch } from "@/lib/events";
 import { useMyUploads } from "@/lib/my-uploads";
-import { pluralize } from "@/lib/utils";
+import { describeSheetPosition } from "@/lib/paging";
 import type { CardStatus } from "@/lib/types";
 
 type CardStatusInfo = {
@@ -60,7 +60,7 @@ function StatusNote({ info }: { info: CardStatusInfo }) {
   if (info.queuePosition !== null) {
     return (
       <Badge variant="info" className="shrink-0">
-        {info.queuePosition === 0 ? "Next up" : `${pluralize(info.queuePosition, "badge")} ahead`}
+        {describeSheetPosition(info.queuePosition, info.queueTotal)}
       </Badge>
     );
   }

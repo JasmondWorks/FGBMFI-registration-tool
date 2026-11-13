@@ -21,8 +21,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api, errorMessage } from "@/lib/api";
 import { emitDeskChanged, useFetch } from "@/lib/events";
+import { describeSheetPosition } from "@/lib/paging";
 import { useMode } from "@/lib/use-mode";
-import { pluralize } from "@/lib/utils";
 import { useOperator } from "@/features/operator/operator-context";
 import { AUDIT_LABELS, CARD_STATUS, exactTime, PAGE_STATUS, personLabel, relativeTime } from "@/lib/format";
 import type { AuditEntry, CardDetail } from "@/lib/types";
@@ -116,11 +116,9 @@ export function BadgeViewer() {
             {card && card.printCount > 1 && <Badge variant="info">Printed {card.printCount}x</Badge>}
           </SheetTitle>
           <SheetDescription className="truncate">{card?.originalFilename ?? (error || "Loading")}</SheetDescription>
-          {queued && statusInfo && (
+          {queued && statusInfo && statusInfo.queuePosition !== null && (
             <p className="text-xs text-muted-foreground">
-              {statusInfo.queuePosition === 0
-                ? "Next in line to be built into a sheet."
-                : `${pluralize(statusInfo.queuePosition ?? 0, "badge")} ahead of it in the queue (${statusInfo.queueTotal} waiting in total).`}
+              {describeSheetPosition(statusInfo.queuePosition, statusInfo.queueTotal)} ({statusInfo.queueTotal} waiting in total)
             </p>
           )}
         </SheetHeader>

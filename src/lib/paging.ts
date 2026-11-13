@@ -34,3 +34,17 @@ export function describeCount(c: CountCheck): string {
   if (c.fullPages === 0) return `${badges}, not enough for a full sheet`;
   return `${badges}: ${sheets} and ${c.remainder} extra`;
 }
+
+/**
+ * A badge's place in the queue in terms of what actually happens to it — a sheet of 4
+ * building and going to print — not its raw position, which reads like a single-file
+ * line one badge doesn't actually move through alone.
+ */
+export function describeSheetPosition(position: number, queueTotal: number, perPage = CARDS_PER_PAGE): string {
+  const sheetsAhead = Math.floor(position / perPage);
+  const ownSheetComplete = queueTotal - sheetsAhead * perPage >= perPage;
+  if (sheetsAhead === 0) {
+    return ownSheetComplete ? "Part of the next sheet — ready to build" : `Waiting on ${perPage - queueTotal} more for a full sheet`;
+  }
+  return `${sheetsAhead} ${sheetsAhead === 1 ? "sheet" : "sheets"} ahead of it`;
+}
