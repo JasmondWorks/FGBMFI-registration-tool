@@ -13,6 +13,7 @@ type TourState = { active: boolean; step: number };
 const TourContext = React.createContext<{
   state: TourState;
   steps: ReturnType<typeof getTourSteps>;
+  isMobile: boolean;
   start: () => void;
   next: () => void;
   back: () => void;
@@ -65,8 +66,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const back = React.useCallback(() => setState((s) => ({ ...s, step: Math.max(0, s.step - 1) })), []);
 
   const value = React.useMemo(
-    () => ({ state, steps, start: begin, next, back, skip: finish }),
-    [state, steps, begin, next, back, finish],
+    () => ({ state, steps, isMobile, start: begin, next, back, skip: finish }),
+    [state, steps, isMobile, begin, next, back, finish],
   );
   return <TourContext.Provider value={value}>{children}</TourContext.Provider>;
 }

@@ -23,7 +23,7 @@ import { TourProvider, useTour } from "@/features/tour/tour-provider";
 import { BadgeViewer } from "@/features/viewer/badge-viewer";
 import { PageViewer } from "@/features/viewer/page-viewer";
 
-const NAV: { href: string; label: string; tourId?: string }[] = [
+export const NAV: { href: string; label: string; tourId?: string }[] = [
   { href: "/", label: "Print desk" },
   { href: "/queue", label: "Queue", tourId: "tour-nav-queue" },
   { href: "/records", label: "Records", tourId: "tour-nav-records" },
