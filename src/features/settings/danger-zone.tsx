@@ -9,14 +9,12 @@ import { Label } from "@/components/ui/label";
 import { api, errorMessage } from "@/lib/api";
 import { emitDeskChanged } from "@/lib/events";
 import { useOperator } from "@/features/operator/operator-context";
-import { useSettingsPin } from "./settings-gate";
 
 const PHRASE = "DELETE EVERYTHING";
 
 /** Wipes all test data: every badge, page, job and audit event, gone for good. */
 export function DangerZone() {
   const { requireOperator } = useOperator();
-  const pin = useSettingsPin();
   const [text, setText] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [open, setOpen] = React.useState(false);
@@ -27,8 +25,8 @@ export function DangerZone() {
     if (!requireOperator() || !canSubmit) return;
     setBusy(true);
     try {
-      // The PIN that unlocked this whole page also authorizes this — no need to ask twice.
-      await api("/api/admin/reset", { method: "POST", json: { confirm: text, pin } });
+      // Authorized by the unlock cookie that got us onto this page — no PIN sent from here.
+      await api("/api/admin/reset", { method: "POST", json: { confirm: text } });
       emitDeskChanged();
       toast.success("Everything's cleared. Starting fresh.");
       setText("");
