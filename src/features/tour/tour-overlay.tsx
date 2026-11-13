@@ -53,7 +53,10 @@ export function TourOverlay() {
       };
 
   return (
-    <div className="fixed inset-0 z-[100]" role="dialog" aria-label="App walkthrough">
+    // h-dvh (not inset-0's implicit layout-viewport height) so the bottom-docked mobile
+    // callout lands inside what's actually visible — the static viewport includes space
+    // hidden behind the browser's address bar, which is what was pushing it out of view.
+    <div className="fixed top-0 left-0 z-100 h-dvh w-screen" role="dialog" aria-label="App walkthrough">
       <svg className="absolute inset-0 size-full" style={{ pointerEvents: box ? "none" : "auto" }}>
         <defs>
           <mask id="tour-mask">
