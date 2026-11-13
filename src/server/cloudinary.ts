@@ -1,10 +1,11 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { eq, lt, sql } from "drizzle-orm";
 import { v2 as cloudinary } from "cloudinary";
+import { after } from "next/server";
 
 import { db } from "./db";
-import { cards } from "./db/schema";
+import { cards, cloudDeleteQueue } from "./db/schema";
 
 /**
  * Cloudinary is the durable copy of every badge file — not a backup. Local disk is only
@@ -73,4 +74,75 @@ export async function uploadCardFile(
 export async function retryCloudSync() {
   const rows = await db.query.cards.findMany({ where: eq(cards.cloudStatus, "FAILED"), columns: { id: true } });
   return rows.length;
+}
+
+const DELETE_MAX_ATTEMPTS = 8;
+const DELETE_BATCH_SIZE = 20;
+
+/**
+ * Queues one badge's file for deletion instead of calling Cloudinary inline — a delete
+ * shouldn't make the operator wait on a third-party network call, or fail the card removal
+ * itself if Cloudinary happens to be slow or briefly unreachable. A worker drains this
+ * (see processDeleteQueue); call triggerDeleteQueue right after to run it promptly without
+ * blocking the response.
+ */
+export async function enqueueDelete(publicId: string) {
+  await db.insert(cloudDeleteQueue).values({ publicId });
+}
+
+/**
+ * Drains the delete queue: destroys each file on Cloudinary and removes its row on
+ * success, or records the failure and leaves it for the next tick (up to a point — past
+ * DELETE_MAX_ATTEMPTS, it's left in place rather than retried forever, so a permanently
+ * bad public_id doesn't spin silently; it stays visible in the table for someone to look
+ * at). Safe to run concurrently/repeatedly — destroy on an already-gone public_id just
+ * reports "not found", which is treated as success.
+ */
+export async function processDeleteQueue() {
+  if (!isCloudEnabled()) return { processed: 0 };
+  configure();
+  const rows = await db.query.cloudDeleteQueue.findMany({
+    where: lt(cloudDeleteQueue.attempts, DELETE_MAX_ATTEMPTS),
+    limit: DELETE_BATCH_SIZE,
+  });
+  let processed = 0;
+  for (const row of rows) {
+    try {
+      await cloudinary.uploader.destroy(row.publicId, { resource_type: "image" });
+      await db.delete(cloudDeleteQueue).where(eq(cloudDeleteQueue.id, row.id));
+      processed++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await db
+        .update(cloudDeleteQueue)
+        .set({ attempts: sql`${cloudDeleteQueue.attempts} + 1`, lastError: message.slice(0, 500) })
+        .where(eq(cloudDeleteQueue.id, row.id));
+    }
+  }
+  return { processed };
+}
+
+/**
+ * Runs the queue worker after the response is sent, not as a bare fire-and-forget promise
+ * — on Vercel a serverless function can be frozen the instant it responds, so an
+ * un-awaited promise can simply never finish. `after()` is the supported way to keep the
+ * function alive long enough to actually do this work. The DB queue is still the real
+ * safety net (a cron hitting /api/admin/process-deletes, or the next delete, picks up
+ * anything this didn't get to) — this just makes the common case feel instant.
+ */
+export function triggerDeleteQueue() {
+  after(() => processDeleteQueue().catch(() => undefined));
+}
+
+/** Wipes every badge file this desk has ever uploaded — used only by the full data reset. */
+export async function deleteAllCardFiles() {
+  if (!isCloudEnabled()) return;
+  configure();
+  // Caps at 1000 assets per call; `partial` means more are left under the prefix, so
+  // calling again picks up the next batch until nothing's left.
+  let partial = true;
+  while (partial) {
+    const result = await cloudinary.api.delete_resources_by_prefix("namecard-desk/", { resource_type: "image" });
+    partial = Boolean(result.partial);
+  }
 }

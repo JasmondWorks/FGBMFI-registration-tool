@@ -201,6 +201,19 @@ export const stagingFiles = pgTable("staging_files", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Deleting a badge from Cloudinary happens through this queue, not inline: a delete
+ * shouldn't fail (or make the operator wait on) a network call to a third party, and
+ * retrying "destroy this public_id" is trivially safe to do blindly on a worker tick.
+ */
+export const cloudDeleteQueue = pgTable("cloud_delete_queue", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  publicId: text("public_id").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
   value: jsonb("value").notNull(),

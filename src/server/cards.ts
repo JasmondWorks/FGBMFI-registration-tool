@@ -7,6 +7,7 @@ import type { RecordsQuery } from "@/lib/records-query";
 import type { CardDetail, Facets } from "@/lib/types";
 import { logEvent } from "./audit";
 import { db } from "./db";
+import { enqueueDelete, triggerDeleteQueue } from "./cloudinary";
 import { auditEvents, cards, jobs, pageItems, pages } from "./db/schema";
 import { UserError } from "./http";
 import { toCardSummary } from "./mappers";
@@ -290,6 +291,14 @@ export async function deleteCard(id: string, operator: string) {
     .where(eq(cards.id, id))
     .returning();
   await logEvent({ type: "DISCARDED", actor: operator, cardId: id, payload: { fullName: card.fullName, reason: "Deleted by operator" } });
+  // Queued, not called inline: the card is already discarded either way, and a Cloudinary
+  // delete shouldn't make this request wait on a third-party round trip. The worker picks
+  // it up right after this responds (see triggerDeleteQueue), with the queue row itself as
+  // the durable retry if that doesn't get to it.
+  if (card.cloudinaryPublicId) {
+    await enqueueDelete(card.cloudinaryPublicId);
+    triggerDeleteQueue();
+  }
   return toCardSummary(updated);
 }
 

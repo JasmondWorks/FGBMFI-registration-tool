@@ -29,6 +29,13 @@
       "when": 1794556325384,
       "tag": "0003_stiff_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794569381179,
+      "tag": "0004_dusty_tarantula",
+      "breakpoints": true
     }
   ]
 }
