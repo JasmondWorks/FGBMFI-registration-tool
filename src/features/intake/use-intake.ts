@@ -35,9 +35,13 @@ export type IntakeState = {
   flagged: FlaggedFile[];
   decisions: Record<string, Decision>;
   targetJobId: string | null;
+  /** This batch gets its own job laid out and printed immediately, isolated from the
+   *  shared FIFO queue entirely — never mixed with anyone else's badges, and never waits
+   *  behind them either. For a specific, time-sensitive handful of names. */
+  priority: boolean;
 };
 
-const initial: IntakeState = { phase: "idle", files: [], flagged: [], decisions: {}, targetJobId: null };
+const initial: IntakeState = { phase: "idle", files: [], flagged: [], decisions: {}, targetJobId: null, priority: false };
 
 export function validateFiles(input: File[]) {
   const accepted: File[] = [];
@@ -65,7 +69,7 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
   const reset = React.useCallback(() => setState(initial), []);
 
   const commit = React.useCallback(
-    async (files: IntakeFile[], decisions: Record<string, Decision>, flagged: FlaggedFile[], targetJobId: string | null) => {
+    async (files: IntakeFile[], decisions: Record<string, Decision>, flagged: FlaggedFile[], targetJobId: string | null, priority = false) => {
       setState((s) => ({ ...s, phase: "saving" }));
       try {
         const ready = files.filter((f) => f.status === "ready" && f.analysis);
@@ -101,9 +105,10 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
         }
         emitDeskChanged();
         setState(initial);
-        if (targetJobId) {
+        if (targetJobId || priority) {
           // Adding files to a job someone's already actively working (e.g. the Fix the
-          // Count dialog's "add more"): keep that flow as it was, stay in that preview.
+          // Count dialog's "add more"), or a priority upload that gets its own job: either
+          // way, lay out just this job's own cards — never mixed with the shared queue.
           const layout = await api<{ ok: boolean; job: JobView }>(`/api/jobs/${committed.jobId}/layout`, { method: "POST", json: {} });
           onJobReady(committed.jobId, layout.job);
         } else {
@@ -147,7 +152,7 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
   );
 
   const start = React.useCallback(
-    async (input: File[], targetJobId: string | null = null) => {
+    async (input: File[], targetJobId: string | null = null, priority = false) => {
       if (busy) {
         toast.warning("Finish the current upload first");
         return;
@@ -165,7 +170,7 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
       if (accepted.length === 0) return;
 
       const files: IntakeFile[] = accepted.map((f, i) => ({ key: `${i}-${f.name}-${f.size}`, name: f.name, size: f.size, status: "pending" }));
-      setState({ phase: "reading", files, flagged: [], decisions: {}, targetJobId });
+      setState({ phase: "reading", files, flagged: [], decisions: {}, targetJobId, priority });
 
       const update = (key: string, patch: Partial<IntakeFile>) =>
         setState((s) => ({ ...s, files: s.files.map((f) => (f.key === key ? { ...f, ...patch } : f)) }));
@@ -199,10 +204,10 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
 
       const flagged = collectFlags(finished);
       if (flagged.length) {
-        setState({ phase: "review", files: finished, flagged, decisions: {}, targetJobId });
+        setState({ phase: "review", files: finished, flagged, decisions: {}, targetJobId, priority });
         return;
       }
-      await commit(finished, {}, [], targetJobId);
+      await commit(finished, {}, [], targetJobId, priority);
     },
     [busy, commit],
   );
@@ -212,7 +217,7 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
   }, []);
 
   const finishReview = React.useCallback(() => {
-    void commit(state.files, state.decisions, state.flagged, state.targetJobId);
+    void commit(state.files, state.decisions, state.flagged, state.targetJobId, state.priority);
   }, [commit, state]);
 
   const cancelReview = React.useCallback(() => setState(initial), []);

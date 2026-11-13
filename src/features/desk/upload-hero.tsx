@@ -4,6 +4,8 @@ import * as React from "react";
 import { useDropzone } from "react-dropzone";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { IntakeProgress, useIntakeContext } from "@/features/intake/intake-provider";
 import { ACCEPTED_TYPES, MAX_FILES_PER_UPLOAD } from "@/features/intake/types";
@@ -18,15 +20,16 @@ export function UploadHero() {
   const intake = useIntakeContext();
   const { requireOperator } = useOperator();
   const busy = intake.busy;
+  const [priority, setPriority] = React.useState(false);
 
   const onDrop = React.useCallback(
     (accepted: File[], rejected: { file: File }[]) => {
       if (!requireOperator()) return;
       // Pass everything through our own validation so the operator gets one clear message.
       const all = [...accepted, ...rejected.map((r) => r.file)];
-      if (all.length) void intake.start(all);
+      if (all.length) void intake.start(all, null, priority);
     },
-    [intake, requireOperator],
+    [intake, requireOperator, priority],
   );
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -45,7 +48,8 @@ export function UploadHero() {
       aria-label="Upload badge files"
       className={cn(
         "relative grid overflow-hidden rounded-xl border bg-card transition-colors md:grid-cols-[1fr_auto]",
-        isDragActive && "border-primary bg-accent/40",
+        isDragActive && (priority ? "border-warning bg-warning-soft/30" : "border-primary bg-accent/40"),
+        priority && !isDragActive && "border-warning/50",
       )}
     >
       <div className="flex flex-col justify-between gap-8 p-8 md:p-10">
@@ -53,14 +57,27 @@ export function UploadHero() {
         <div className="flex max-w-xl flex-col gap-3">
           <p className="text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">Lagos National Convention 2026</p>
           <h1 className="text-[34px] leading-[1.08] font-semibold tracking-[-0.025em] text-balance md:text-[42px]">
-            {isDragActive ? "Release to read the badges" : "Drop the badge files here and the sheets lay themselves out"}
+            {isDragActive
+              ? "Release to read the badges"
+              : priority
+                ? "Drop the files that need to jump the line"
+                : "Drop the badge files here and the sheets lay themselves out"}
           </h1>
           <p className="max-w-lg text-[15px] leading-relaxed text-muted-foreground">
-            Any number of PDFs from the registration platform. They&apos;re checked for duplicates and join the{" "}
-            <a href="/queue" className="underline underline-offset-2 hover:text-foreground">
-              print queue
-            </a>
-            . Every full sheet of 4 prints itself automatically — nothing to do for a clean batch.
+            {priority ? (
+              <>
+                This batch skips the shared queue entirely — it never mixes with anyone else&apos;s badges and gets its own sheet(s),
+                ready for the printer the moment it&apos;s in.
+              </>
+            ) : (
+              <>
+                Any number of PDFs from the registration platform. They&apos;re checked for duplicates and join the{" "}
+                <a href="/queue" className="underline underline-offset-2 hover:text-foreground">
+                  print queue
+                </a>
+                . Every full sheet of 4 prints itself automatically — nothing to do for a clean batch.
+              </>
+            )}
           </p>
         </div>
 
@@ -69,13 +86,21 @@ export function UploadHero() {
             <IntakeProgress />
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-            <Button size="lg" onClick={open}>
-              Choose badge files
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              or drag them anywhere on this panel. PDF, PNG or JPG, up to {MAX_FILES_PER_UPLOAD} at once.
-            </span>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+              <Button size="lg" onClick={open}>
+                {priority ? "Choose priority files" : "Choose badge files"}
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                or drag them anywhere on this panel. PDF, PNG or JPG, up to {MAX_FILES_PER_UPLOAD} at once.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="priority-upload" checked={priority} onCheckedChange={(v) => setPriority(!!v)} />
+              <Label htmlFor="priority-upload" className="text-sm font-normal text-muted-foreground">
+                Priority — skip the queue, print this batch on its own sheet(s) right away
+              </Label>
+            </div>
           </div>
         )}
       </div>
