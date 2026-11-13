@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-const QUERY = "(max-width: 1279px)";
+const QUERY = "(max-width: 1535px)";
 
 function subscribe(onChange: () => void) {
   const mq = window.matchMedia(QUERY);

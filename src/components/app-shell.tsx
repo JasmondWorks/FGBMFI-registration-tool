@@ -106,13 +106,13 @@ function TopBar({ mode }: { mode: DeskMode }) {
           (menu + logo) and right (actions) cluster that never shrink, with the nav in
           between given the leftover space — and permission to scroll itself horizontally
           rather than ever overlapping its neighbors if that leftover space runs out. */}
-      <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-3 sm:gap-4 sm:px-5">
+      <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-4 px-3 sm:gap-6 sm:px-5">
         <div className="flex shrink-0 items-center gap-2.5">
           <button
             type="button"
             onClick={() => setNavOpen(true)}
             data-tour="tour-hamburger"
-            className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none min-[1280px]:hidden"
+            className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none min-[1536px]:hidden"
             aria-label="Open menu"
           >
             <MenuIcon className="size-5" />
@@ -122,26 +122,26 @@ function TopBar({ mode }: { mode: DeskMode }) {
             <Wordmark compact />
           </Link>
 
-          {/* Below 1280px the real switcher lives in the sidebar, not the topbar — but
+          {/* Below 1536px the real switcher lives in the sidebar, not the topbar — but
               which mode this device is in should still be visible at a glance without
               opening that drawer, and a one-word pill costs almost no width to do it. */}
-          <span className="hidden shrink-0 rounded-full border bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize min-[400px]:inline min-[1280px]:hidden">
+          <span className="hidden shrink-0 rounded-full border bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize min-[400px]:inline min-[1536px]:hidden">
             {mode}
           </span>
         </div>
 
         <nav
           aria-label="Main"
-          className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none min-[1280px]:flex"
+          className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-none min-[1536px]:flex"
         >
           {nav.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} />
           ))}
         </nav>
 
-        <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5 sm:gap-2.5">
+        <div className="ml-auto flex shrink-0 items-center justify-end gap-2 sm:gap-3">
           {mode === "printer" && <UnconfirmedIndicator />}
-          <div className="hidden min-[1280px]:block">
+          <div className="hidden min-[1536px]:block">
             <ModeSwitcher />
           </div>
           <ReplayTourButton />
