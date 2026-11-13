@@ -52,22 +52,16 @@ export function DeskOverview() {
     <div className="flex flex-col gap-8">
       <dl className="grid grid-cols-2 border-y sm:grid-cols-4">
         {stats.map((s, i) => {
-          const body = (
-            <>
-              <dt className="text-xs text-muted-foreground">{s.label}</dt>
-              <dd className="tnum mt-1 text-2xl font-semibold tracking-[-0.02em] group-hover:text-primary">{s.value}</dd>
-            </>
-          );
           const cls = i > 0 ? "border-l px-5 py-4" : "py-4 pr-5";
-          // "Not printed yet" is a count of the queue — link straight there instead of
-          // repeating the same list in a second place on this page.
-          return s.label === "Not printed yet" ? (
-            <a key={s.label} href="/queue" className={`group ${cls} transition-colors hover:bg-accent/30`}>
-              {body}
-            </a>
-          ) : (
+          // "Not printed yet" counts everything short of printed — including badges
+          // already built into a sheet (below, "Built, not printed") or sent to the
+          // printer. The Queue page only shows what hasn't been built into a sheet at
+          // all, a narrower thing — linking there understated what this number actually
+          // means, since most of it is typically already visible further down this page.
+          return (
             <div key={s.label} className={cls}>
-              {body}
+              <dt className="text-xs text-muted-foreground">{s.label}</dt>
+              <dd className="tnum mt-1 text-2xl font-semibold tracking-[-0.02em]">{s.value}</dd>
             </div>
           );
         })}
