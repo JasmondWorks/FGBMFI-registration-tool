@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { api, errorMessage, getOperator, runPool } from "@/lib/api";
 import { emitDeskChanged } from "@/lib/events";
+import { addMyUploads } from "@/lib/my-uploads";
 import type { AnalyzedFile, JobView } from "@/lib/types";
 import { useMode } from "@/lib/use-mode";
 import { pluralize } from "@/lib/utils";
@@ -96,6 +97,7 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
           json: { items, excludedStagingIds: excluded, jobId: targetJobId },
         });
         if (excluded.length) toast.message(`${pluralize(excluded.length, "file")} left out`);
+        addMyUploads(committed.cardIds);
         if (!committed.jobId || committed.cardIds.length === 0) {
           if (!targetJobId) toast.message("No new badges to add");
           setState(initial);

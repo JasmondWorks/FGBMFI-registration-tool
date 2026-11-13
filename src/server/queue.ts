@@ -5,7 +5,7 @@ import { and, asc, inArray, sql, type SQL } from "drizzle-orm";
 import { CARDS_PER_PAGE } from "@/lib/paging";
 import { normalizeText } from "@/lib/badge/normalize";
 import { db } from "./db";
-import { cards, jobs } from "./db/schema";
+import { cards, jobs, type Card } from "./db/schema";
 import { toCardSummary } from "./mappers";
 import { layoutJob } from "./pages";
 import { UserError } from "./http";
@@ -51,6 +51,52 @@ export async function getQueueCount() {
     .from(cards)
     .where(inArray(cards.status, ["UPLOADED", "WAITING_TRAY"]));
   return Number(total);
+}
+
+export type CardStatusInfo = {
+  id: string;
+  fullName: string;
+  status: Card["status"];
+  printCount: number;
+  /** 0-based: how many badges are ahead of this one, only set while it's actually queued. */
+  queuePosition: number | null;
+  queueTotal: number;
+};
+
+/**
+ * Live status for a specific set of badges — an uploader has no login and no "my jobs"
+ * concept, just a device that remembers what it recently sent in, so this is the one
+ * place that turns a handful of card ids into "still queued (N ahead of it), built,
+ * printed, or given out" without making them dig through Records to find out.
+ */
+export async function getCardStatuses(cardIds: string[]): Promise<CardStatusInfo[]> {
+  if (cardIds.length === 0) return [];
+  const rows = await db.query.cards.findMany({
+    where: inArray(cards.id, cardIds),
+    columns: { id: true, fullName: true, status: true, printCount: true },
+  });
+  const queued = rows.filter((r) => r.status === "UPLOADED" || r.status === "WAITING_TRAY");
+  const queueTotal = await getQueueCount();
+  let positions = new Map<string, number>();
+  if (queued.length) {
+    const ranked = await db.execute<{ id: string; pos: number }>(sql`
+      select id, pos from (
+        select id, row_number() over (order by queue_rank asc nulls last, created_at asc, id asc) - 1 as pos
+        from ${cards}
+        where status in ('UPLOADED', 'WAITING_TRAY')
+      ) ranked
+      where id in (${sql.join(queued.map((r) => sql`${r.id}`), sql`, `)})
+    `);
+    positions = new Map(ranked.rows.map((r) => [r.id, Number(r.pos)]));
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    fullName: r.fullName,
+    status: r.status,
+    printCount: r.printCount,
+    queuePosition: positions.get(r.id) ?? null,
+    queueTotal,
+  }));
 }
 
 /**

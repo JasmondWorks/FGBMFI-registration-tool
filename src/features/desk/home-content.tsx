@@ -3,6 +3,7 @@
 import { useMode } from "@/lib/use-mode";
 import { CollectionConfirm } from "@/features/collection/collection-confirm";
 import { DeskOverview } from "./desk-overview";
+import { MyUploads } from "./my-uploads";
 import { UploadHero } from "./upload-hero";
 
 /**
@@ -26,10 +27,13 @@ export function HomeContent() {
       {mode === "printer" ? (
         <DeskOverview />
       ) : (
-        <p className="max-w-lg text-sm text-muted-foreground">
-          Looking for someone&apos;s badge? Press <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs">Ctrl/Cmd K</kbd> or use
-          the search icon in the top bar to find it by name and see whether it&apos;s printed yet.
-        </p>
+        <>
+          <MyUploads />
+          <p className="max-w-lg text-sm text-muted-foreground">
+            Looking for someone else&apos;s badge? Press <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs">Ctrl/Cmd K</kbd> or
+            use the search icon in the top bar to find it by name.
+          </p>
+        </>
       )}
     </div>
   );
