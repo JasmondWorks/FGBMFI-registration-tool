@@ -107,7 +107,7 @@ function TopBar({ mode }: { mode: DeskMode }) {
             type="button"
             onClick={() => setNavOpen(true)}
             data-tour="tour-hamburger"
-            className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none min-[900px]:hidden"
+            className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none min-[1280px]:hidden"
             aria-label="Open menu"
           >
             <MenuIcon className="size-5" />
@@ -120,7 +120,7 @@ function TopBar({ mode }: { mode: DeskMode }) {
 
         <nav
           aria-label="Main"
-          className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto min-[900px]:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none min-[1280px]:flex"
         >
           {nav.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} />
@@ -129,7 +129,7 @@ function TopBar({ mode }: { mode: DeskMode }) {
 
         <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5 sm:gap-2.5">
           {mode === "printer" && <UnconfirmedIndicator />}
-          <div className="hidden min-[900px]:block">
+          <div className="hidden min-[1280px]:block">
             <ModeSwitcher />
           </div>
           <ReplayTourButton />
