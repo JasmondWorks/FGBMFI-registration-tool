@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,6 @@ import { setReprintDraft } from "@/features/reprint/reprint-draft";
 /** One printed (or ready) A4 sheet exactly as it was laid out, opened with ?page=<id>. */
 export function PageViewer() {
   const overlay = useOverlay();
-  const router = useRouter();
   const { settings, openConfirm } = usePrint();
   const id = overlay.page;
   const { data, error } = useFetch(id ? `page:${id}` : null, () => api<{ pages: PageView[] }>(`/api/pages?ids=${id}`));
@@ -27,8 +25,7 @@ export function PageViewer() {
 
   function reprint(cardIds: string[]) {
     setReprintDraft({ cardIds });
-    overlay.close("page");
-    router.push("/reprint");
+    overlay.swap("page", "reprint", "1");
   }
 
   return (

@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import {
@@ -37,7 +36,6 @@ import { addToReprintDraft, getReprintDraft, setReprintDraft } from "@/features/
  */
 export function BadgeViewer() {
   const overlay = useOverlay();
-  const router = useRouter();
   const { requireOperator } = useOperator();
   const id = overlay.view;
   const { data, error, reload } = useFetch(id ? `card:${id}` : null, () => api<CardDetail>(`/api/cards/${id}`));
@@ -54,8 +52,7 @@ export function BadgeViewer() {
   function reprint() {
     if (!card) return;
     setReprintDraft({ cardIds: [card.id] });
-    overlay.close("view");
-    router.push("/reprint");
+    overlay.swap("view", "reprint", "1");
   }
 
   async function deleteBadge() {
@@ -76,7 +73,7 @@ export function BadgeViewer() {
     if (!card) return;
     addToReprintDraft([card.id]);
     toast.success(`${card.fullName} added to the reprint list`, {
-      action: { label: "Open list", onClick: () => router.push("/reprint") },
+      action: { label: "Open list", onClick: () => overlay.swap("view", "reprint", "1") },
     });
   }
 
@@ -156,8 +153,8 @@ export function BadgeViewer() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete {card.fullName}&apos;s badge?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        For a wrong upload, duplicate, or typo&apos;d entry. It's removed from search, the queue, and duplicate
-                        checks, but stays in the audit trail. This can't be undone from here — ask an admin if you need it back.
+                        For a wrong upload, duplicate, or typo&apos;d entry. It&apos;s removed from search, the queue, and duplicate
+                        checks, but stays in the audit trail. This can&apos;t be undone from here — ask an admin if you need it back.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

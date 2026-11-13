@@ -14,6 +14,7 @@ import { IntakeProvider } from "@/features/intake/intake-provider";
 import { OperatorProvider } from "@/features/operator/operator-context";
 import { OperatorPicker } from "@/features/operator/operator-picker";
 import { JobPreview } from "@/features/preview/job-preview";
+import { ReprintOverlay } from "@/features/reprint/reprint-overlay";
 import { PrintProvider } from "@/features/print/print-provider";
 import { QuickFind } from "@/features/quick-find/quick-find";
 import { BadgeViewer } from "@/features/viewer/badge-viewer";
@@ -44,6 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <BadgeViewer />
                 <PageViewer />
                 <JobPreview />
+                <ReprintOverlay />
               </IntakeProvider>
             </React.Suspense>
           </PrintProvider>

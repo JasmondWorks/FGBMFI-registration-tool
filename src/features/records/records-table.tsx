@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type VisibilityState } from "@tanstack/react-table";
 import { toast } from "sonner";
 
@@ -43,7 +42,6 @@ function useSelection() {
 }
 
 export function RecordsTable() {
-  const router = useRouter();
   const overlay = useOverlay();
   const { query, update, apiParams, activeCount, clear } = useRecordsQuery();
   const list = useFetch(`cards?${apiParams}`, () => api<{ rows: CardSummary[]; total: number }>(`/api/cards?${apiParams}`));
@@ -200,7 +198,7 @@ export function RecordsTable() {
               <DropdownMenuItem
                 onSelect={() => {
                   setReprintDraft({ cardIds: [row.original.id] });
-                  router.push("/reprint");
+                  overlay.open("reprint", "1");
                 }}
               >
                 Reprint
@@ -493,7 +491,7 @@ export function RecordsTable() {
               onClick={() => {
                 addToReprintDraft([...selected]);
                 setSelected(() => new Set());
-                router.push("/reprint");
+                overlay.open("reprint", "1");
               }}
             >
               Reprint selected

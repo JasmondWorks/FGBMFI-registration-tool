@@ -33,7 +33,7 @@ const SEARCH_SIZE = 25;
  * Search and pick any number of badges, give a reason, and they're laid out 4 per sheet
  * in list order, the same way as a normal upload, with the same multiple-of-4 rule.
  */
-export function ReprintBuilder() {
+export function ReprintBuilder({ onDone }: { onDone?: (jobId: string) => void } = {}) {
   const overlay = useOverlay();
   const { requireOperator } = useOperator();
   const [draft, setDraft] = useReprintDraft();
@@ -94,7 +94,8 @@ export function ReprintBuilder() {
       setFix(null);
       emitDeskChanged();
       toast.success("Reprint sheets are ready");
-      overlay.open("job", res.jobId!);
+      if (onDone) onDone(res.jobId!);
+      else overlay.open("job", res.jobId!);
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {

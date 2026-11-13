@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +12,7 @@ import { emitDeskChanged, useFetch } from "@/lib/events";
 import { personLabel } from "@/lib/format";
 import type { PageView } from "@/lib/types";
 import { cn, pluralize } from "@/lib/utils";
+import { useOverlay } from "@/features/overlays/use-overlay";
 import { setReprintDraft } from "@/features/reprint/reprint-draft";
 
 /**
@@ -20,7 +20,7 @@ import { setReprintDraft } from "@/features/reprint/reprint-draft";
  * jammed or came out wrong. This answer is what marks badges as printed.
  */
 export function ConfirmPrintDialog({ pageIds, onClose }: { pageIds: string[] | null; onClose: () => void }) {
-  const router = useRouter();
+  const overlay = useOverlay();
   const key = pageIds?.join(",") ?? null;
   const fetched = useFetch(key ? `confirm:${key}` : null, () => api<{ pages: PageView[] }>(`/api/pages?ids=${key}`));
   const pages = React.useMemo(
@@ -79,7 +79,7 @@ export function ConfirmPrintDialog({ pageIds, onClose }: { pageIds: string[] | n
       toast.success(`${pluralize(ok, "badge")} saved to the printed list`);
       if (thenReprint && failed.length) {
         setReprintDraft({ cardIds: failed.map((f) => f.card.id), reason: "Misprint" });
-        router.push("/reprint");
+        overlay.open("reprint", "1");
       }
       onClose();
     } catch (err) {

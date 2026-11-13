@@ -180,7 +180,11 @@ export function PrintProvider({ children }: { children: React.ReactNode }) {
   return (
     <PrintContext.Provider value={value}>
       {children}
-      <ConfirmPrintDialog pageIds={confirmIds} onClose={() => setConfirmIds(null)} />
+      {/* Now reads the URL (via useOverlay, for the reprint handoff), so it needs its own
+          boundary — it renders outside the tree's main Suspense wrapper in app-shell. */}
+      <React.Suspense>
+        <ConfirmPrintDialog pageIds={confirmIds} onClose={() => setConfirmIds(null)} />
+      </React.Suspense>
       {phase.kind === "printing" && phase.mode === "DIRECT" && (
         <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 rounded-md border bg-card px-4 py-2.5 text-sm shadow-lg">
           Printer queue: <span className="tnum font-medium">{phase.spooled}</span> of{" "}
