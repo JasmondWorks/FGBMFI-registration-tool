@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api, errorMessage } from "@/lib/api";
 import { emitDeskChanged, useFetch } from "@/lib/events";
 import { useMode } from "@/lib/use-mode";
+import { pluralize } from "@/lib/utils";
 import { useOperator } from "@/features/operator/operator-context";
 import { AUDIT_LABELS, CARD_STATUS, exactTime, PAGE_STATUS, personLabel, relativeTime } from "@/lib/format";
 import type { AuditEntry, CardDetail } from "@/lib/types";
@@ -48,6 +49,13 @@ export function BadgeViewer() {
   const [onCard, setOnCard] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [markingGivenOut, setMarkingGivenOut] = React.useState(false);
+
+  // Where it actually stands — visible for any badge, from anywhere, not just the device
+  // that uploaded it. Only meaningful while it's still sitting in the shared queue.
+  const queued = card && (card.status === "UPLOADED" || card.status === "WAITING_TRAY");
+  const { data: statusInfo } = useFetch(queued ? `card-status:${card.id}` : null, () =>
+    api<{ queuePosition: number | null; queueTotal: number }[]>(`/api/cards/status?ids=${card!.id}`).then((r) => r[0]),
+  );
 
   const [shownId, setShownId] = React.useState(id);
   if (id !== shownId) {
@@ -108,6 +116,13 @@ export function BadgeViewer() {
             {card && card.printCount > 1 && <Badge variant="info">Printed {card.printCount}x</Badge>}
           </SheetTitle>
           <SheetDescription className="truncate">{card?.originalFilename ?? (error || "Loading")}</SheetDescription>
+          {queued && statusInfo && (
+            <p className="text-xs text-muted-foreground">
+              {statusInfo.queuePosition === 0
+                ? "Next in line to be built into a sheet."
+                : `${pluralize(statusInfo.queuePosition ?? 0, "badge")} ahead of it in the queue (${statusInfo.queueTotal} waiting in total).`}
+            </p>
+          )}
         </SheetHeader>
 
         {!card && !error && (
