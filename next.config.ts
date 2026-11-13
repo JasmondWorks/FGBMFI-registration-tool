@@ -6,6 +6,13 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   // These packages use Node APIs / workers and must not be bundled for the server.
   serverExternalPackages: ["pdfjs-dist", "@neondatabase/serverless", "ws", "cloudinary", "pdf-to-printer"],
+  // pdfjs-dist is external (above), so Vercel's output tracer has to be told explicitly
+  // about its worker file — it's loaded by a dynamic path inside pdfjs' own code that the
+  // tracer can't follow statically, so without this the deployed function is missing it
+  // and every PDF silently falls back to filename-only extraction.
+  outputFileTracingIncludes: {
+    "/api/intake/analyze": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+  },
   webpack(config) {
     // Allow Webpack to resolve font files referenced by CSS in node_modules
     // (e.g. @fontsource packages that use relative ./files/ URLs).

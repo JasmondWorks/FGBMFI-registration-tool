@@ -116,10 +116,10 @@ export function QueueView() {
       emitDeskChanged();
       // Prioritizing isn't a separate step from printing: if that was enough to complete
       // a sheet, it goes straight to the printer like a fresh upload would.
-      const built = await api<{ jobId?: string | null; job?: JobView } | null>("/api/queue/build-all", { method: "POST", json: {} });
-      if (built?.jobId && built.job) {
+      const built = await api<{ built: boolean; ok?: boolean; job?: JobView }>("/api/queue/build-all", { method: "POST", json: {} });
+      if (built.built && built.ok && built.job) {
         toast.success("Prioritized — sheet is ready");
-        overlay.open("job", built.jobId);
+        overlay.open("job", built.job.id);
       } else {
         toast.success(`${pluralize(selectedRows.length, "badge")} moved to the front of the queue`);
       }
@@ -134,7 +134,11 @@ export function QueueView() {
         <div>
           <h1 className="text-xl font-semibold">Print queue</h1>
           <p className="text-sm text-muted-foreground">
-            {total === 0 ? "Nothing waiting." : `${pluralize(total, "badge")} waiting to print.`}
+            {total === 0
+              ? "Nothing waiting."
+              : total % CARDS_PER_PAGE === 0
+                ? `${pluralize(total, "badge")} waiting — sheets build and print themselves automatically.`
+                : `${pluralize(total, "badge")} waiting — ${CARDS_PER_PAGE - (total % CARDS_PER_PAGE)} more needed before the next sheet builds itself.`}
           </p>
         </div>
         <div className="flex items-center gap-2">

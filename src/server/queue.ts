@@ -103,7 +103,7 @@ export async function buildFromQueue(opts: { cardIds?: string[]; filter?: QueueQ
 export async function buildAllFromQueue(operator: string) {
   const total = await getQueueCount();
   const fullSheets = Math.floor(total / CARDS_PER_PAGE);
-  if (fullSheets === 0) return null;
+  if (fullSheets === 0) return { built: false as const, queueTotal: total, remainder: total };
 
   const rows = await db
     .select({ id: cards.id })
@@ -114,5 +114,6 @@ export async function buildAllFromQueue(operator: string) {
   const ids = rows.map((r) => r.id);
 
   const [job] = await db.insert(jobs).values({ kind: "QUEUE", operator }).returning();
-  return layoutJob(job.id, { addCardIds: ids, order: ids }, operator);
+  const result = await layoutJob(job.id, { addCardIds: ids, order: ids }, operator);
+  return { built: true as const, queueTotal: total, remainder: total - ids.length, ...result };
 }

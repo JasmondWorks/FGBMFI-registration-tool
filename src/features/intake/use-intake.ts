@@ -109,15 +109,23 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
           // the queue now supports (across all uploads, FIFO) builds and opens right
           // away — so a clean multiple-of-4 upload just prints, same as before the
           // queue existed. Any remainder that doesn't complete a sheet stays queued.
-          const built = await api<{ ok: boolean; needsCountFix?: boolean; jobId?: string | null; job?: JobView } | null>("/api/queue/build-all", {
-            method: "POST",
-            json: {},
-          });
-          if (built?.jobId && built.job) {
-            onJobReady(built.jobId, built.job);
+          const built = await api<{ built: boolean; queueTotal: number; remainder: number; ok?: boolean; job?: JobView }>(
+            "/api/queue/build-all",
+            { method: "POST", json: {} },
+          );
+          if (built.built && built.ok && built.job) {
+            onJobReady(built.job.id, built.job);
+            if (built.remainder > 0) {
+              toast.message(`${pluralize(built.remainder, "badge")} still waiting — not enough left for another sheet yet.`, {
+                action: { label: "Open queue", onClick: () => router.push("/queue") },
+              });
+            }
           } else {
+            // Shows the real queue total, not just this upload's count — the gap between
+            // the two (older leftovers from a prior uneven upload) is exactly what makes
+            // an on-its-own-divisible-by-4 batch still come up short.
             toast.success(`${pluralize(committed.cardIds.length, "badge")} added to the queue`, {
-              description: "Not enough for a full sheet yet.",
+              description: `${pluralize(built.queueTotal, "badge")} waiting in total — ${4 - (built.queueTotal % 4)} more needed for the next sheet.`,
               action: { label: "Open queue", onClick: () => router.push("/queue") },
             });
           }
