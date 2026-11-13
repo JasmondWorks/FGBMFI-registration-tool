@@ -109,6 +109,22 @@ export async function scanPrintedBadge(bytes: Uint8Array): Promise<ScanResult> {
   };
 }
 
+const SCAN_CONCURRENCY = 3;
+
+/** Scans a whole batch of photos in one call — OCR runs a few at a time, not all at once. */
+export async function scanPrintedBadges(files: Uint8Array[]): Promise<ScanResult[]> {
+  const results = new Array<ScanResult>(files.length);
+  let next = 0;
+  async function worker() {
+    while (next < files.length) {
+      const i = next++;
+      results[i] = await scanPrintedBadge(files[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(SCAN_CONCURRENCY, files.length) }, worker));
+  return results;
+}
+
 /** Marks matched-but-unprinted cards as printed, confirmed via photo instead of the normal print flow. */
 export async function confirmDispatched(cardIds: string[], operator: string) {
   if (cardIds.length === 0) return { updated: 0 };

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { api, errorMessage, runPool } from "@/lib/api";
+import { api, errorMessage } from "@/lib/api";
 import { emitDeskChanged } from "@/lib/events";
 import type { AnalyzedFile, CardSummary } from "@/lib/types";
 import { personLabel } from "@/lib/format";
@@ -25,7 +25,8 @@ type ScanResult = {
 
 type ScanRow = { key: string; photoName: string; status: "scanning" | "done" | "failed"; error?: string; result?: ScanResult; added?: boolean };
 
-const SCAN_CONCURRENCY = 3;
+/** One camera/file picker session at a time; the server also enforces this. */
+const MAX_PER_BATCH = 20;
 
 /**
  * Reconcile badges that were physically printed but that the system doesn't know were
@@ -45,23 +46,29 @@ export function ReconcileView() {
   const toConfirm = rows.filter((r) => r.result?.match && !r.result.alreadyPrinted && !r.added);
   const unmatched = rows.filter((r) => r.status === "done" && !r.result?.match && !r.added);
 
-  async function onPhotos(files: File[]) {
-    if (files.length === 0) return;
+  async function onPhotos(selected: File[]) {
+    if (selected.length === 0) return;
     if (!requireOperator()) return;
+    if (selected.length > MAX_PER_BATCH) {
+      toast.error(`Up to ${MAX_PER_BATCH} photos at once`, { description: `You picked ${selected.length}. Take them in smaller batches.` });
+      return;
+    }
+    const files = selected;
     const newRows: ScanRow[] = files.map((f, i) => ({ key: `${Date.now()}-${i}-${f.name}`, photoName: f.name, status: "scanning" }));
     setRows((prev) => [...newRows, ...prev]);
     setBusy(true);
-    await runPool(files, SCAN_CONCURRENCY, async (file, i) => {
-      const key = newRows[i].key;
-      try {
-        const form = new FormData();
-        form.append("file", file);
-        const result = await api<ScanResult>("/api/reconcile/scan", { method: "POST", body: form });
-        setRows((prev) => prev.map((r) => (r.key === key ? { ...r, status: "done", result } : r)));
-      } catch (err) {
-        setRows((prev) => prev.map((r) => (r.key === key ? { ...r, status: "failed", error: errorMessage(err) } : r)));
-      }
-    });
+    try {
+      const form = new FormData();
+      for (const f of files) form.append("files", f);
+      const results = await api<(ScanResult & { photoName: string })[]>("/api/reconcile/scan-batch", { method: "POST", body: form });
+      setRows((prev) => {
+        const byKey = new Map(newRows.map((r, i) => [r.key, results[i]]));
+        return prev.map((r) => (byKey.has(r.key) ? { ...r, status: "done", result: byKey.get(r.key) } : r));
+      });
+    } catch (err) {
+      const message = errorMessage(err);
+      setRows((prev) => prev.map((r) => (newRows.some((n) => n.key === r.key) ? { ...r, status: "failed", error: message } : r)));
+    }
     setBusy(false);
   }
 
