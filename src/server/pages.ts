@@ -463,6 +463,22 @@ export async function clearTray(operator: string) {
 /* Desk overview                                                       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * How many sheets were sent to the printer but nobody's confirmed yet. Printed status has
+ * to be trustworthy — it's what tells an operator whether to send a delegate to collect
+ * their badge — so this is surfaced everywhere, not just on the home page, instead of
+ * something that can silently sit unresolved.
+ */
+export async function getUnconfirmedCount(): Promise<{ ids: string[]; oldestSentAt: string | null }> {
+  const rows = await db
+    .select({ id: pages.id, sentAt: pages.sentAt })
+    .from(pages)
+    .where(inArray(pages.status, ["SENT", "SPOOLED"]))
+    .orderBy(asc(pages.sentAt))
+    .limit(500);
+  return { ids: rows.map((r) => r.id), oldestSentAt: rows[0]?.sentAt ? rows[0].sentAt.toISOString() : null };
+}
+
 export async function getDeskOverview() {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);

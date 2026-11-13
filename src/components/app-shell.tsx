@@ -16,6 +16,7 @@ import { OperatorPicker } from "@/features/operator/operator-picker";
 import { JobPreview } from "@/features/preview/job-preview";
 import { ReprintOverlay } from "@/features/reprint/reprint-overlay";
 import { PrintProvider } from "@/features/print/print-provider";
+import { UnconfirmedIndicator } from "@/features/print/unconfirmed-indicator";
 import { QuickFind } from "@/features/quick-find/quick-find";
 import { TourOverlay } from "@/features/tour/tour-overlay";
 import { TourProvider, useTour } from "@/features/tour/tour-provider";
@@ -88,6 +89,7 @@ function TopBar() {
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5 sm:gap-3">
+          <UnconfirmedIndicator />
           <ReplayTourButton />
           <div data-tour="tour-quickfind">
             <QuickFind />
