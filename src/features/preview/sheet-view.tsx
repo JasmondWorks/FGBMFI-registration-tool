@@ -19,9 +19,10 @@ export type SheetSlotItem = { slot: number; card: CardSummary; printed?: boolean
 type SheetViewProps = {
   items: SheetSlotItem[];
   showTemplate?: boolean;
-  offsetXmm?: number;
-  offsetYmm?: number;
-  /** Extra Y shift for the bottom row only (slots 3 & 4), on top of offsetYmm. */
+  /** Independent drift correction for each row — see PrintSettings. */
+  offsetXmmRow1?: number;
+  offsetYmmRow1?: number;
+  offsetXmmRow2?: number;
   offsetYmmRow2?: number;
   /** Rough on-screen width, used to pick the render resolution. */
   renderWidth?: number;
@@ -33,8 +34,9 @@ type SheetViewProps = {
 export function SheetView({
   items,
   showTemplate = true,
-  offsetXmm = 0,
-  offsetYmm = 0,
+  offsetXmmRow1 = 0,
+  offsetYmmRow1 = 0,
+  offsetXmmRow2 = 0,
   offsetYmmRow2 = 0,
   renderWidth = 520,
   selectedSlot,
@@ -56,8 +58,9 @@ export function SheetView({
           const row = Math.floor((slot - 1) / 2);
           const selected = selectedSlot === slot;
           const interactive = !!onSlotClick && !!item;
-          const y = offsetYmm + (row === 1 ? offsetYmmRow2 : 0);
-          const shift = { transform: `translate(${(offsetXmm / 210) * 100}%, ${(y / 297) * 100}%)` };
+          const x = row === 1 ? offsetXmmRow2 : offsetXmmRow1;
+          const y = row === 1 ? offsetYmmRow2 : offsetYmmRow1;
+          const shift = { transform: `translate(${(x / 210) * 100}%, ${(y / 297) * 100}%)` };
           return (
             <div
               key={slot}

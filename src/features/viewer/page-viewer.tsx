@@ -53,8 +53,9 @@ export function PageViewer() {
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto p-6 sm:grid-cols-[1fr_220px]">
             <SheetView
               items={page.items.map((i) => ({ slot: i.slot, card: i.card, printed: i.printed }))}
-              offsetXmm={settings.offsetXmm}
-              offsetYmm={settings.offsetYmm}
+              offsetXmmRow1={settings.offsetXmmRow1}
+              offsetYmmRow1={settings.offsetYmmRow1}
+              offsetXmmRow2={settings.offsetXmmRow2}
               offsetYmmRow2={settings.offsetYmmRow2}
               renderWidth={420}
             />

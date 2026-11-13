@@ -6,11 +6,12 @@ import type { CardStatus, PageStatus } from "@/server/db/schema";
 export type { CardStatus, PageStatus };
 
 export type PrintSettings = {
-  /** Shift everything on the sheet to correct printer drift. Positive X = right, positive Y = down. */
-  offsetXmm: number;
-  offsetYmm: number;
-  /** Extra Y shift for the bottom row only (slots 3 & 4), on top of offsetYmm. Printers often
-   *  drift more on the trailing edge of the sheet, so the two rows can need different corrections. */
+  /** Independent drift correction for each row (slots 1&2 vs 3&4) — printers often drift
+   *  differently across the sheet (and not just vertically), so each row gets its own X
+   *  and Y. Positive X = right, positive Y = down. */
+  offsetXmmRow1: number;
+  offsetYmmRow1: number;
+  offsetXmmRow2: number;
   offsetYmmRow2: number;
   /** 100 = actual size. Only change if the printer scales consistently. */
   scalePct: number;
@@ -25,8 +26,9 @@ export type PrintSettings = {
 };
 
 export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
-  offsetXmm: 0,
-  offsetYmm: 0,
+  offsetXmmRow1: 0,
+  offsetYmmRow1: 0,
+  offsetXmmRow2: 0,
   offsetYmmRow2: 0,
   scalePct: 100,
   cutMarks: false,

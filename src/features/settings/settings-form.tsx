@@ -112,23 +112,27 @@ export function SettingsForm() {
         </div>
       </Section>
 
-      <Section title="Lining up with the pre-printed cards" hint="If names land a little off on the real cards, nudge them here. Print the calibration sheet on plain paper and hold it against a card sheet to check.">
-        <div className="grid grid-cols-3 gap-4">
-          <NumberField id="ox" label="Move right (mm)" value={form.offsetXmm} step={0.5} onChange={(v) => set("offsetXmm", v)} />
-          <NumberField id="oy" label="Move down (mm)" value={form.offsetYmm} step={0.5} onChange={(v) => set("offsetYmm", v)} />
-          <NumberField id="sc" label="Scale (%)" value={form.scalePct} step={0.5} onChange={(v) => set("scalePct", v)} />
+      <Section
+        title="Lining up with the pre-printed cards"
+        hint="If names land a little off on the real cards, nudge them here. Each row has its own X and Y, since printers often drift differently across the sheet, not just top-to-bottom. Print the calibration sheet on plain paper and hold it against a card sheet to check."
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-3 rounded-md border p-3">
+            <span className="text-xs font-medium text-muted-foreground uppercase">Top row (cards 1 &amp; 2)</span>
+            <div className="grid grid-cols-2 gap-3">
+              <NumberField id="ox1" label="Move right (mm)" value={form.offsetXmmRow1} step={0.5} onChange={(v) => set("offsetXmmRow1", v)} />
+              <NumberField id="oy1" label="Move down (mm)" value={form.offsetYmmRow1} step={0.5} onChange={(v) => set("offsetYmmRow1", v)} />
+            </div>
+          </div>
+          <div className="flex flex-col gap-3 rounded-md border p-3">
+            <span className="text-xs font-medium text-muted-foreground uppercase">Bottom row (cards 3 &amp; 4)</span>
+            <div className="grid grid-cols-2 gap-3">
+              <NumberField id="ox2" label="Move right (mm)" value={form.offsetXmmRow2} step={0.5} onChange={(v) => set("offsetXmmRow2", v)} />
+              <NumberField id="oy2" label="Move down (mm)" value={form.offsetYmmRow2} step={0.5} onChange={(v) => set("offsetYmmRow2", v)} />
+            </div>
+          </div>
         </div>
-        <NumberField
-          id="oy2"
-          label="Bottom row (cards 3 & 4): extra move up (mm)"
-          value={-form.offsetYmmRow2}
-          step={0.5}
-          onChange={(v) => set("offsetYmmRow2", -v)}
-        />
-        <p className="text-xs text-muted-foreground">
-          On top of the offset above. Printers often drift more on the trailing edge of the sheet, so if the bottom two
-          cards print lower than the top two, nudge this up.
-        </p>
+        <NumberField id="sc" label="Scale (%)" value={form.scalePct} step={0.5} onChange={(v) => set("scalePct", v)} className="max-w-40" />
         <label className="flex items-start gap-3 text-sm">
           <Checkbox checked={form.printTemplate} onCheckedChange={(v) => set("printTemplate", !!v)} className="mt-0.5" />
           <span>
@@ -189,9 +193,23 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   );
 }
 
-function NumberField({ id, label, value, step, onChange }: { id: string; label: string; value: number; step: number; onChange: (v: number) => void }) {
+function NumberField({
+  id,
+  label,
+  value,
+  step,
+  onChange,
+  className,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  step: number;
+  onChange: (v: number) => void;
+  className?: string;
+}) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className={cn("flex flex-col gap-1.5", className)}>
       <Label htmlFor={id}>{label}</Label>
       <Input id={id} type="number" step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="tnum" />
     </div>

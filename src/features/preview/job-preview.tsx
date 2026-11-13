@@ -267,8 +267,9 @@ export function JobPreview() {
                     <SheetView
                       items={selected.items.map((i) => ({ slot: i.slot, card: i.card, printed: i.printed }))}
                       showTemplate={showTemplate}
-                      offsetXmm={settings.offsetXmm}
-                      offsetYmm={settings.offsetYmm}
+                      offsetXmmRow1={settings.offsetXmmRow1}
+                      offsetYmmRow1={settings.offsetYmmRow1}
+                      offsetXmmRow2={settings.offsetXmmRow2}
                       offsetYmmRow2={settings.offsetYmmRow2}
                       renderWidth={560}
                       selectedSlot={slot}
