@@ -1,11 +1,11 @@
 import "server-only";
 
-import { and, asc, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
 
 import { CARDS_PER_PAGE } from "@/lib/paging";
 import { normalizeText } from "@/lib/badge/normalize";
 import { db } from "./db";
-import { cards, jobs, type Card } from "./db/schema";
+import { cards, jobs, pageItems, pages, type Card } from "./db/schema";
 import { toCardSummary } from "./mappers";
 import { layoutJob } from "./pages";
 import { UserError } from "./http";
@@ -45,6 +45,14 @@ export async function listQueue(q: QueueQuery) {
   return { rows: rows.map(toCardSummary), total: Number(total) };
 }
 
+/** Search the shared queue by name/chapter/district/ID, with each match's sheet grouping — for
+ *  anyone (any device, any mode) looking up a specific person rather than just their own uploads. */
+export async function searchQueueWithStatus(q: string, limit = 20): Promise<CardStatusInfo[]> {
+  if (!q.trim()) return [];
+  const { rows } = await listQueue({ q, p: 1, size: limit });
+  return getCardStatuses(rows.map((r) => r.id));
+}
+
 export async function getQueueCount() {
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)` })
@@ -61,13 +69,20 @@ export type CardStatusInfo = {
   /** 0-based: how many badges are ahead of this one, only set while it's actually queued. */
   queuePosition: number | null;
   queueTotal: number;
+  /** A stable key for "these cards are on/will be on the same sheet" — a real page id
+   *  once one exists, or a virtual one for a future sheet still forming in the queue. */
+  groupKey: string;
+  /** Everyone sharing that sheet, in print order — not just this card alone, since
+   *  nothing prints by itself. Full 4 once the sheet is real or complete; fewer while a
+   *  future sheet is still waiting on more badges to fill it out. */
+  sheetNames: string[];
 };
 
 /**
  * Live status for a specific set of badges — an uploader has no login and no "my jobs"
  * concept, just a device that remembers what it recently sent in, so this is the one
- * place that turns a handful of card ids into "still queued (N ahead of it), built,
- * printed, or given out" without making them dig through Records to find out.
+ * place that turns a handful of card ids into "still queued (as part of which sheet,
+ * with who else), built, printed, or given out" without making them dig through Records.
  */
 export async function getCardStatuses(cardIds: string[]): Promise<CardStatusInfo[]> {
   if (cardIds.length === 0) return [];
@@ -76,8 +91,11 @@ export async function getCardStatuses(cardIds: string[]): Promise<CardStatusInfo
     columns: { id: true, fullName: true, status: true, printCount: true },
   });
   const queued = rows.filter((r) => r.status === "UPLOADED" || r.status === "WAITING_TRAY");
+  const onPage = rows.filter((r) => r.status === "ON_PAGE" || r.status === "PRINT_SENT");
   const queueTotal = await getQueueCount();
-  let positions = new Map<string, number>();
+
+  const positions = new Map<string, number>();
+  const queueChunks = new Map<number, string[]>(); // chunk index -> names in that future sheet
   if (queued.length) {
     const ranked = await db.execute<{ id: string; pos: number }>(sql`
       select id, pos from (
@@ -87,16 +105,56 @@ export async function getCardStatuses(cardIds: string[]): Promise<CardStatusInfo
       ) ranked
       where id in (${sql.join(queued.map((r) => sql`${r.id}`), sql`, `)})
     `);
-    positions = new Map(ranked.rows.map((r) => [r.id, Number(r.pos)]));
+    for (const r of ranked.rows) positions.set(r.id, Number(r.pos));
+    const chunkIndexes = [...new Set([...positions.values()].map((p) => Math.floor(p / CARDS_PER_PAGE)))];
+    if (chunkIndexes.length) {
+      const order = await db
+        .select({ fullName: cards.fullName })
+        .from(cards)
+        .where(inArray(cards.status, ["UPLOADED", "WAITING_TRAY"]))
+        .orderBy(...ORDER)
+        .limit(Math.max(...chunkIndexes) * CARDS_PER_PAGE + CARDS_PER_PAGE);
+      for (const ci of chunkIndexes) queueChunks.set(ci, order.slice(ci * CARDS_PER_PAGE, ci * CARDS_PER_PAGE + CARDS_PER_PAGE).map((o) => o.fullName));
+    }
   }
-  return rows.map((r) => ({
-    id: r.id,
-    fullName: r.fullName,
-    status: r.status,
-    printCount: r.printCount,
-    queuePosition: positions.get(r.id) ?? null,
-    queueTotal,
-  }));
+
+  const pageInfo = new Map<string, { pageId: string; names: string[] }>();
+  if (onPage.length) {
+    const theirItems = await db
+      .select({ cardId: pageItems.cardId, pageId: pageItems.pageId })
+      .from(pageItems)
+      .innerJoin(pages, eq(pages.id, pageItems.pageId))
+      .where(and(inArray(pageItems.cardId, onPage.map((r) => r.id)), inArray(pages.status, ["READY", "SENT", "SPOOLED"])));
+    const pageIds = [...new Set(theirItems.map((i) => i.pageId))];
+    if (pageIds.length) {
+      const allItems = await db
+        .select({ pageId: pageItems.pageId, slot: pageItems.slot, fullName: cards.fullName })
+        .from(pageItems)
+        .innerJoin(cards, eq(cards.id, pageItems.cardId))
+        .where(inArray(pageItems.pageId, pageIds))
+        .orderBy(asc(pageItems.slot));
+      const namesByPage = new Map<string, string[]>();
+      for (const i of allItems) namesByPage.set(i.pageId, [...(namesByPage.get(i.pageId) ?? []), i.fullName]);
+      for (const i of theirItems) pageInfo.set(i.cardId, { pageId: i.pageId, names: namesByPage.get(i.pageId) ?? [] });
+    }
+  }
+
+  return rows.map((r) => {
+    const pos = positions.get(r.id);
+    const onP = pageInfo.get(r.id);
+    const groupKey = onP ? `page:${onP.pageId}` : pos !== undefined ? `queue:${Math.floor(pos / CARDS_PER_PAGE)}` : `card:${r.id}`;
+    const sheetNames = onP ? onP.names : pos !== undefined ? (queueChunks.get(Math.floor(pos / CARDS_PER_PAGE)) ?? [r.fullName]) : [r.fullName];
+    return {
+      id: r.id,
+      fullName: r.fullName,
+      status: r.status,
+      printCount: r.printCount,
+      queuePosition: pos ?? null,
+      queueTotal,
+      groupKey,
+      sheetNames,
+    };
+  });
 }
 
 /**

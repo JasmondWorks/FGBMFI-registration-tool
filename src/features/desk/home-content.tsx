@@ -4,6 +4,7 @@ import { useMode } from "@/lib/use-mode";
 import { CollectionConfirm } from "@/features/collection/collection-confirm";
 import { DeskOverview } from "./desk-overview";
 import { MyUploads } from "./my-uploads";
+import { QueueSearch } from "./queue-search";
 import { UploadHero } from "./upload-hero";
 
 /**
@@ -29,10 +30,7 @@ export function HomeContent() {
       ) : (
         <>
           <MyUploads />
-          <p className="max-w-lg text-sm text-muted-foreground">
-            Looking for someone else&apos;s badge? Press <kbd className="rounded border bg-card px-1.5 py-0.5 text-xs">Ctrl/Cmd K</kbd> or
-            use the search icon in the top bar to find it by name.
-          </p>
+          <QueueSearch />
         </>
       )}
     </div>
