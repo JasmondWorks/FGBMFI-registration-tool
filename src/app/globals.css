@@ -88,6 +88,9 @@
   }
   html {
     font-feature-settings: "ss01", "cv11";
+    /* Bumps every rem-based text size (nearly all of them) up proportionally in one place,
+       rather than hunting down every text-xs/text-sm individually across the app. */
+    font-size: 17.5px;
   }
   body {
     @apply bg-background text-foreground;
