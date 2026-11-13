@@ -72,6 +72,7 @@ function TopBar() {
         <button
           type="button"
           onClick={() => setNavOpen(true)}
+          data-tour="tour-hamburger"
           className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none md:hidden"
           aria-label="Open menu"
         >

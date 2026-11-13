@@ -4,14 +4,13 @@ import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { TOUR_STEPS } from "./tour-steps";
 import { useTour } from "./tour-provider";
 
 /** Spotlights the real element for the current step with a cutout + a callout pointing at it. */
 export function TourOverlay() {
-  const { state, next, back, skip } = useTour();
+  const { state, steps, next, back, skip } = useTour();
   const [rect, setRect] = React.useState<DOMRect | null>(null);
-  const step = TOUR_STEPS[state.step];
+  const step = steps[state.step];
 
   React.useEffect(() => {
     if (!state.active || !step) return;
@@ -26,6 +25,16 @@ export function TourOverlay() {
   }, [state.active, step]);
 
   if (!state.active || !step) return null;
+
+  function goNext() {
+    // The next step (a nav link) lives inside the mobile drawer — open it first so that
+    // step's target actually exists to spotlight, instead of showing a dim screen with
+    // nothing highlighted.
+    if (step!.target === "tour-hamburger") {
+      (document.querySelector('[data-tour="tour-hamburger"]') as HTMLElement | null)?.click();
+    }
+    next();
+  }
 
   const pad = 8;
   const box = rect && { top: rect.top - pad, left: rect.left - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 };
@@ -51,11 +60,11 @@ export function TourOverlay() {
         />
       )}
       <div
-        className="absolute w-80 rounded-lg border bg-card p-4 shadow-xl transition-all duration-150"
+        className="absolute w-80 max-w-[calc(100vw-24px)] rounded-lg border bg-card p-4 shadow-xl transition-all duration-150"
         style={{ top: calloutTop, left: calloutLeft }}
       >
         <p className="text-xs font-medium text-muted-foreground">
-          Step {state.step + 1} of {TOUR_STEPS.length}
+          Step {state.step + 1} of {steps.length}
         </p>
         <h2 className="mt-1 text-base font-semibold">{step.title}</h2>
         <p className="mt-1.5 text-sm text-muted-foreground">{step.body}</p>
@@ -69,8 +78,8 @@ export function TourOverlay() {
                 Back
               </Button>
             )}
-            <Button size="sm" onClick={next} className={cn(state.step === 0 && "ml-auto")}>
-              {state.step + 1 === TOUR_STEPS.length ? "Done" : "Next"}
+            <Button size="sm" onClick={goNext} className={cn(state.step === 0 && "ml-auto")}>
+              {state.step + 1 === steps.length ? "Done" : "Next"}
             </Button>
           </div>
         </div>
