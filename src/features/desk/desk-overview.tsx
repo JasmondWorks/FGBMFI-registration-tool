@@ -27,6 +27,7 @@ export function DeskOverview() {
   const overlay = useOverlay();
   const { openConfirm } = usePrint();
   const [jobSearch, setJobSearch] = React.useState("");
+  const [confirmSearch, setConfirmSearch] = React.useState("");
 
   if (error && !data) return <p className="text-sm text-destructive">{error}</p>;
   if (!data) {
@@ -162,11 +163,42 @@ export function DeskOverview() {
           {data.waiting.length === 0 ? (
             <Empty>Nothing to confirm. Every printed sheet&apos;s been checked against what came out.</Empty>
           ) : (
-            <ul className="divide-y rounded-md border bg-card">
-              {data.waiting.map((p) => (
-                <PageRow key={p.id} page={p} onOpen={() => overlay.open("page", p.id)} action={<Button size="sm" variant="outline" onClick={() => openConfirm([p.id])}>Confirm</Button>} />
-              ))}
-            </ul>
+            <>
+              {data.waiting.length > 1 && (
+                <Input
+                  value={confirmSearch}
+                  onChange={(e) => setConfirmSearch(e.target.value)}
+                  placeholder="Find a sheet by name — which one is theirs?"
+                  className="h-9"
+                />
+              )}
+              {(() => {
+                const q = confirmSearch.trim().toLowerCase();
+                const visible = q
+                  ? data.waiting.filter((p) => p.items.some((i) => i.card.fullName.toLowerCase().includes(q)))
+                  : data.waiting;
+                if (visible.length === 0) {
+                  return <Empty>No sheet waiting on confirmation has a name matching &ldquo;{confirmSearch}&rdquo;.</Empty>;
+                }
+                return (
+                  <ul className="divide-y rounded-md border bg-card">
+                    {visible.map((p) => (
+                      <PageRow
+                        key={p.id}
+                        page={p}
+                        highlight={q}
+                        onOpen={() => overlay.open("page", p.id)}
+                        action={
+                          <Button size="sm" variant="outline" onClick={() => openConfirm([p.id])}>
+                            Confirm
+                          </Button>
+                        }
+                      />
+                    ))}
+                  </ul>
+                );
+              })()}
+            </>
           )}
 
           <SectionHead title="Recent sheets" className="mt-6" />
@@ -185,8 +217,11 @@ export function DeskOverview() {
   );
 }
 
-function PageRow({ page, onOpen, action }: { page: PageView; onOpen: () => void; action?: React.ReactNode }) {
+function PageRow({ page, onOpen, action, highlight }: { page: PageView; onOpen: () => void; action?: React.ReactNode; highlight?: string }) {
   const st = PAGE_STATUS[page.status];
+  const names = page.items.map((i) => i.card.fullName);
+  const match = highlight ? names.find((n) => n.toLowerCase().includes(highlight)) : null;
+  const rest = match ? names.filter((n) => n !== match) : names;
   return (
     <li className="flex items-center gap-3 px-4 py-3">
       <button onClick={onOpen} className="flex min-w-0 flex-1 flex-col text-left">
@@ -195,7 +230,14 @@ function PageRow({ page, onOpen, action }: { page: PageView; onOpen: () => void;
           <Badge variant={st.tone}>{st.label}</Badge>
         </span>
         <span className="truncate text-xs text-muted-foreground">
-          {page.items.map((i) => i.card.fullName).join(", ")}
+          {match ? (
+            <>
+              <mark className="rounded-sm bg-[oklch(0.9_0.08_95)] px-0.5 text-foreground">{match}</mark>
+              {rest.length > 0 ? `, ${rest.join(", ")}` : ""}
+            </>
+          ) : (
+            names.join(", ")
+          )}
         </span>
       </button>
       <span className="shrink-0 text-xs text-muted-foreground">{relativeTime(page.confirmedAt ?? page.sentAt ?? page.createdAt)}</span>
