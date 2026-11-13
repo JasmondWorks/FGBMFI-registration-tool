@@ -17,3 +17,10 @@ export function addMyUploads(cardIds: string[]) {
   if (cardIds.length === 0) return;
   store.set((prev) => [...cardIds, ...prev.filter((id) => !cardIds.includes(id))].slice(0, MAX_TRACKED));
 }
+
+/** Drops ids that have reached a state this list no longer needs to track — see my-uploads.tsx. */
+export function removeMyUploads(cardIds: string[]) {
+  if (cardIds.length === 0) return;
+  const drop = new Set(cardIds);
+  store.set((prev) => prev.filter((id) => !drop.has(id)));
+}
