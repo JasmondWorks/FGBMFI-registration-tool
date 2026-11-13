@@ -23,7 +23,9 @@ export type AuditType =
   | "DISCARDED"
   | "CLOUD_SYNCED"
   | "CLOUD_FAILED"
-  | "RECONCILED_PRINTED";
+  | "RECONCILED_PRINTED"
+  | "GIVEN_OUT"
+  | "GIVEN_OUT_UNDONE";
 
 export type AuditInput = {
   type: AuditType;

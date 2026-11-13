@@ -29,6 +29,7 @@ export const cardStatus = pgEnum("card_status", [
   "ON_PAGE", // placed on a page that hasn't been printed
   "PRINT_SENT", // print started, waiting for the operator to confirm
   "PRINTED", // confirmed printed at least once
+  "GIVEN_OUT", // physically handed to the attendee — the actual last step
   "DISCARDED", // removed by the operator
   "SUPERSEDED", // replaced by a newer badge for the same person
 ]);

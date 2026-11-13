@@ -38,6 +38,9 @@ export const NAV: { href: string; label: string; tourId?: string }[] = [
 // A device set to Uploader has nothing to do with the print pipeline at all — just
 // dropping files and checking whether someone's badge is in and printed yet.
 const UPLOADER_NAV: typeof NAV = [{ href: "/", label: "Upload" }, { href: "/records", label: "Records" }];
+// Collection is a dedicated "hand the badge over" station — same minimal shape as
+// Uploader, just centered on confirming pickup instead of intake.
+const COLLECTION_NAV: typeof NAV = [{ href: "/", label: "Collection" }, { href: "/records", label: "Records" }];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [mode] = useMode();
@@ -85,7 +88,7 @@ function RouteGuard({ mode }: { mode: DeskMode }) {
   const pathname = usePathname();
   const router = useRouter();
   React.useEffect(() => {
-    if (mode === "uploader" && PRINTER_ONLY_PREFIXES.some((p) => pathname.startsWith(p))) {
+    if (mode !== "printer" && PRINTER_ONLY_PREFIXES.some((p) => pathname.startsWith(p))) {
       router.replace("/");
     }
   }, [mode, pathname, router]);
@@ -95,7 +98,7 @@ function RouteGuard({ mode }: { mode: DeskMode }) {
 function TopBar({ mode }: { mode: DeskMode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = React.useState(false);
-  const nav = mode === "printer" ? NAV : UPLOADER_NAV;
+  const nav = mode === "printer" ? NAV : mode === "collection" ? COLLECTION_NAV : UPLOADER_NAV;
 
   return (
     <header className="sticky top-0 z-30 border-b bg-background/92 backdrop-blur-[2px]">
@@ -179,7 +182,7 @@ function ModeSwitcher() {
   const [mode, setMode] = useMode();
   return (
     <div role="radiogroup" aria-label="Device mode" className="flex items-center rounded-md border bg-card p-0.5 text-xs font-medium">
-      {(["uploader", "printer"] as const).map((m) => (
+      {(["uploader", "printer", "collection"] as const).map((m) => (
         <button
           key={m}
           type="button"

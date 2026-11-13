@@ -1,0 +1,1 @@
+ALTER TYPE "public"."card_status" ADD VALUE 'GIVEN_OUT' BEFORE 'DISCARDED';

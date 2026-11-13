@@ -41,11 +41,13 @@ export function BadgeViewer() {
   const { requireOperator } = useOperator();
   const [mode] = useMode();
   const isPrinter = mode === "printer";
+  const canCollect = mode !== "uploader";
   const id = overlay.view;
   const { data, error, reload } = useFetch(id ? `card:${id}` : null, () => api<CardDetail>(`/api/cards/${id}`));
   const card = data && data.id === id ? data : null;
   const [onCard, setOnCard] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [markingGivenOut, setMarkingGivenOut] = React.useState(false);
 
   const [shownId, setShownId] = React.useState(id);
   if (id !== shownId) {
@@ -79,6 +81,21 @@ export function BadgeViewer() {
     toast.success(`${card.fullName} added to the reprint list`, {
       action: { label: "Open list", onClick: () => overlay.swap("view", "reprint", "1") },
     });
+  }
+
+  async function toggleGivenOut() {
+    if (!card || !requireOperator()) return;
+    setMarkingGivenOut(true);
+    try {
+      await api(`/api/cards/${card.id}/given-out`, { method: card.status === "GIVEN_OUT" ? "DELETE" : "POST" });
+      emitDeskChanged();
+      reload();
+      toast.success(card.status === "GIVEN_OUT" ? `Undone — ${card.fullName}'s badge is back to printed` : `${card.fullName}'s badge marked given out`);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setMarkingGivenOut(false);
+    }
   }
 
   return (
@@ -134,6 +151,20 @@ export function BadgeViewer() {
                     {getReprintDraft().cardIds.includes(card.id) ? "In reprint list" : "Add to list"}
                   </Button>
                 </div>
+              )}
+              {canCollect && (card.status === "PRINTED" || card.status === "GIVEN_OUT") && (
+                <Button
+                  variant={card.status === "GIVEN_OUT" ? "outline" : "default"}
+                  disabled={markingGivenOut}
+                  onClick={toggleGivenOut}
+                >
+                  {markingGivenOut ? "Saving..." : card.status === "GIVEN_OUT" ? "Undo — mark as not given out" : "Mark badge as given out"}
+                </Button>
+              )}
+              {canCollect && card.status !== "PRINTED" && card.status !== "GIVEN_OUT" && card.status !== "DISCARDED" && (
+                <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                  Not confirmed printed yet — nothing to hand out.
+                </p>
               )}
               <Button variant="ghost" size="sm" asChild>
                 <a href={`${cardFileUrl(card.id)}?download=1`}>Download original</a>

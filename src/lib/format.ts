@@ -29,6 +29,7 @@ export const CARD_STATUS: Record<CardStatus, { label: string; tone: Tone }> = {
   ON_PAGE: { label: "On a sheet", tone: "info" },
   PRINT_SENT: { label: "Awaiting check", tone: "warning" },
   PRINTED: { label: "Printed", tone: "success" },
+  GIVEN_OUT: { label: "Given out", tone: "success" },
   DISCARDED: { label: "Removed", tone: "outline" },
   SUPERSEDED: { label: "Replaced", tone: "outline" },
 };
@@ -71,4 +72,6 @@ export const AUDIT_LABELS: Record<string, string> = {
   DISCARDED: "Removed",
   CLOUD_SYNCED: "Backed up to cloud",
   CLOUD_FAILED: "Cloud backup failed",
+  GIVEN_OUT: "Given out to its owner",
+  GIVEN_OUT_UNDONE: "Given-out mark undone",
 };

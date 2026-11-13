@@ -303,6 +303,32 @@ export async function deleteCard(id: string, operator: string) {
 }
 
 /**
+ * The actual last step: the badge wasn't just printed, it physically left the desk with
+ * its owner. Only ever from PRINTED — a badge that hasn't printed yet can't have been
+ * handed to anyone. Reversible (handed to the wrong person, or clicked by mistake) by
+ * undoGivenOut below, which is exactly the "last line of defense" this exists for.
+ */
+export async function markGivenOut(id: string, operator: string) {
+  const card = await db.query.cards.findFirst({ where: eq(cards.id, id) });
+  if (!card) throw new UserError("Badge not found", 404);
+  if (card.status !== "PRINTED") {
+    throw new UserError(`${card.fullName}'s badge isn't confirmed printed yet — nothing to hand out.`);
+  }
+  const [updated] = await db.update(cards).set({ status: "GIVEN_OUT", updatedAt: new Date() }).where(eq(cards.id, id)).returning();
+  await logEvent({ type: "GIVEN_OUT", actor: operator, cardId: id, payload: { fullName: card.fullName } });
+  return toCardSummary(updated);
+}
+
+export async function undoGivenOut(id: string, operator: string) {
+  const card = await db.query.cards.findFirst({ where: eq(cards.id, id) });
+  if (!card) throw new UserError("Badge not found", 404);
+  if (card.status !== "GIVEN_OUT") throw new UserError(`${card.fullName}'s badge isn't marked given out.`);
+  const [updated] = await db.update(cards).set({ status: "PRINTED", updatedAt: new Date() }).where(eq(cards.id, id)).returning();
+  await logEvent({ type: "GIVEN_OUT_UNDONE", actor: operator, cardId: id, payload: { fullName: card.fullName } });
+  return toCardSummary(updated);
+}
+
+/**
  * Manually sets the crop region for a FULL_CARD-format badge (one with the whole card's
  * artwork baked in, not just a name overlay) — there's no automatic way to know where the
  * dynamic part sits on an unfamiliar template, so the operator draws it once. Box is in
