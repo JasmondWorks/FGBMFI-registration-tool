@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api, errorMessage, getOperator, runPool } from "@/lib/api";
 import { emitDeskChanged } from "@/lib/events";
 import type { AnalyzedFile, JobView } from "@/lib/types";
+import { useMode } from "@/lib/use-mode";
 import { pluralize } from "@/lib/utils";
 import { collectFlags } from "./flags";
 import {
@@ -57,6 +58,7 @@ export function validateFiles(input: File[]) {
 
 export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
   const router = useRouter();
+  const [mode] = useMode();
   const [state, setState] = React.useState<IntakeState>(initial);
   const busy = state.phase !== "idle";
 
@@ -115,7 +117,13 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
           );
           if (built.built && built.ok && built.job) {
             onJobReady(built.job.id, built.job);
-            if (built.remainder > 0) {
+            // On an Uploader device onJobReady doesn't open the print preview (that's the
+            // printer station's job), so this toast is the only confirmation they get.
+            if (mode === "uploader") {
+              toast.success(`${pluralize(committed.cardIds.length, "badge")} added — a sheet is ready for the printer.`, {
+                description: built.remainder > 0 ? `${pluralize(built.remainder, "badge")} still waiting on the next one.` : undefined,
+              });
+            } else if (built.remainder > 0) {
               toast.message(`${pluralize(built.remainder, "badge")} still waiting — not enough left for another sheet yet.`, {
                 action: { label: "Open queue", onClick: () => router.push("/queue") },
               });
@@ -135,7 +143,7 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
         setState((s) => ({ ...s, phase: s.flagged.length ? "review" : "idle" }));
       }
     },
-    [onJobReady, router],
+    [onJobReady, router, mode],
   );
 
   const start = React.useCallback(

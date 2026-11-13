@@ -21,6 +21,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api, errorMessage } from "@/lib/api";
 import { emitDeskChanged, useFetch } from "@/lib/events";
+import { useMode } from "@/lib/use-mode";
 import { useOperator } from "@/features/operator/operator-context";
 import { AUDIT_LABELS, CARD_STATUS, exactTime, PAGE_STATUS, personLabel, relativeTime } from "@/lib/format";
 import type { AuditEntry, CardDetail } from "@/lib/types";
@@ -38,6 +39,8 @@ import { addToReprintDraft, getReprintDraft, setReprintDraft } from "@/features/
 export function BadgeViewer() {
   const overlay = useOverlay();
   const { requireOperator } = useOperator();
+  const [mode] = useMode();
+  const isPrinter = mode === "printer";
   const id = overlay.view;
   const { data, error, reload } = useFetch(id ? `card:${id}` : null, () => api<CardDetail>(`/api/cards/${id}`));
   const card = data && data.id === id ? data : null;
@@ -122,14 +125,16 @@ export function BadgeViewer() {
                   <BadgeImage src={cardFileUrl(card.id)} mimeType={card.mimeType} width={260} alt={`Badge for ${card.fullName}`} />
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Button onClick={reprint} disabled={card.status === "DISCARDED"}>
-                  Reprint
-                </Button>
-                <Button variant="outline" onClick={addToList} disabled={card.status === "DISCARDED"}>
-                  {getReprintDraft().cardIds.includes(card.id) ? "In reprint list" : "Add to list"}
-                </Button>
-              </div>
+              {isPrinter && (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button onClick={reprint} disabled={card.status === "DISCARDED"}>
+                    Reprint
+                  </Button>
+                  <Button variant="outline" onClick={addToList} disabled={card.status === "DISCARDED"}>
+                    {getReprintDraft().cardIds.includes(card.id) ? "In reprint list" : "Add to list"}
+                  </Button>
+                </div>
+              )}
               <Button variant="ghost" size="sm" asChild>
                 <a href={`${cardFileUrl(card.id)}?download=1`}>Download original</a>
               </Button>
@@ -143,7 +148,7 @@ export function BadgeViewer() {
                   Open the badge this replaced
                 </Button>
               )}
-              {card.status !== "DISCARDED" && (
+              {isPrinter && card.status !== "DISCARDED" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">

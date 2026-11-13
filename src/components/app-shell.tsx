@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { QueryClientProvider } from "@tanstack/react-query";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -10,6 +10,7 @@ import { Toaster, TooltipProvider } from "@/components/ui/misc";
 import { MenuIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { queryClient } from "@/lib/query-client";
+import { useMode, type DeskMode } from "@/lib/use-mode";
 import { IntakeProvider } from "@/features/intake/intake-provider";
 import { OperatorProvider } from "@/features/operator/operator-context";
 import { OperatorPicker } from "@/features/operator/operator-picker";
@@ -33,7 +34,14 @@ export const NAV: { href: string; label: string; tourId?: string }[] = [
   { href: "/guide", label: "Guide" },
 ];
 
+// A device set to Uploader has nothing to do with the print pipeline at all — just
+// dropping files and checking whether someone's badge is in and printed yet.
+const UPLOADER_NAV: typeof NAV = [{ href: "/", label: "Upload" }, { href: "/records", label: "Records" }];
+
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const [mode] = useMode();
+  const isPrinter = mode === "printer";
+
   return (
     <QueryClientProvider client={queryClient}>
       <OperatorProvider>
@@ -43,13 +51,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <IntakeProvider>
                 <TourProvider>
                   <div className="flex min-h-dvh flex-col">
-                    <TopBar />
-                    <main className="flex-1">{children}</main>
+                    <TopBar mode={mode} />
+                    <main className="flex-1">
+                      <RouteGuard mode={mode} />
+                      {children}
+                    </main>
                   </div>
                   <BadgeViewer />
-                  <PageViewer />
-                  <JobPreview />
-                  <ReprintOverlay />
+                  {/* Printer-only surfaces: a device set to Uploader never sees the print
+                      pipeline, so these can't pop open and interrupt someone mid-upload. */}
+                  {isPrinter && <PageViewer />}
+                  {isPrinter && <JobPreview />}
+                  {isPrinter && <ReprintOverlay />}
                   <TourOverlay />
                 </TourProvider>
               </IntakeProvider>
@@ -62,9 +75,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TopBar() {
+// Printer-only pages (the print pipeline). Not just hidden from nav — a bookmarked link
+// or a typed URL shouldn't be able to land an Uploader device on them either.
+const PRINTER_ONLY_PREFIXES = ["/queue", "/reprint", "/reconcile", "/settings"];
+
+function RouteGuard({ mode }: { mode: DeskMode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  React.useEffect(() => {
+    if (mode === "uploader" && PRINTER_ONLY_PREFIXES.some((p) => pathname.startsWith(p))) {
+      router.replace("/");
+    }
+  }, [mode, pathname, router]);
+  return null;
+}
+
+function TopBar({ mode }: { mode: DeskMode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = React.useState(false);
+  const nav = mode === "printer" ? NAV : UPLOADER_NAV;
 
   return (
     <header className="sticky top-0 z-30 border-b bg-background/92 backdrop-blur-[2px]">
@@ -73,7 +102,7 @@ function TopBar() {
           type="button"
           onClick={() => setNavOpen(true)}
           data-tour="tour-hamburger"
-          className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none md:hidden"
+          className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none min-[900px]:hidden"
           aria-label="Open menu"
         >
           <MenuIcon className="size-5" />
@@ -83,14 +112,17 @@ function TopBar() {
           <Wordmark compact />
         </Link>
 
-        <nav aria-label="Main" className="hidden items-center gap-0.5 md:flex">
-          {NAV.map((item) => (
+        <nav aria-label="Main" className="hidden min-w-0 items-center gap-0.5 min-[900px]:flex">
+          {nav.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} />
           ))}
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5 sm:gap-3">
-          <UnconfirmedIndicator />
+          {mode === "printer" && <UnconfirmedIndicator />}
+          <div className="hidden min-[900px]:block">
+            <ModeSwitcher />
+          </div>
           <ReplayTourButton />
           <div data-tour="tour-quickfind">
             <QuickFind />
@@ -110,14 +142,41 @@ function TopBar() {
               </span>
             </SheetTitle>
           </SheetHeader>
-          <nav aria-label="Main" className="flex flex-col gap-1 p-3">
-            {NAV.map((item) => (
-              <NavLink key={item.href} item={item} pathname={pathname} onClick={() => setNavOpen(false)} block />
-            ))}
-          </nav>
+          <div className="flex flex-col gap-4 p-3">
+            <ModeSwitcher />
+            <nav aria-label="Main" className="flex flex-col gap-1">
+              {nav.map((item) => (
+                <NavLink key={item.href} item={item} pathname={pathname} onClick={() => setNavOpen(false)} block />
+              ))}
+            </nav>
+          </div>
         </SheetContent>
       </Sheet>
     </header>
+  );
+}
+
+/** Which interface this device shows — a per-device setting, not per-operator (see use-mode.ts). */
+function ModeSwitcher() {
+  const [mode, setMode] = useMode();
+  return (
+    <div role="radiogroup" aria-label="Device mode" className="flex items-center rounded-md border bg-card p-0.5 text-xs font-medium">
+      {(["uploader", "printer"] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          role="radio"
+          aria-checked={mode === m}
+          onClick={() => setMode(m)}
+          className={cn(
+            "rounded-sm px-2.5 py-1.5 capitalize transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none",
+            mode === m ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {m}
+        </button>
+      ))}
+    </div>
   );
 }
 

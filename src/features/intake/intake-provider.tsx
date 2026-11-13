@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { Progress } from "@/components/ui/misc";
 import type { JobView } from "@/lib/types";
+import { useMode } from "@/lib/use-mode";
 import { useOverlay } from "@/features/overlays/use-overlay";
 import { DuplicateDialog } from "./duplicate-dialog";
 import { useIntake } from "./use-intake";
@@ -13,15 +14,23 @@ const IntakeContext = React.createContext<IntakeContextValue | null>(null);
 
 /**
  * App-wide upload pipeline, so the hero, "add more files" in the preview, and the
- * duplicate review all share one state. When a batch is ready the preview opens itself.
+ * duplicate review all share one state. When a batch is ready the preview opens itself —
+ * except on an Uploader device, which never sees the print pipeline at all, so a finished
+ * sheet shouldn't pop a print preview in front of someone who's just trying to keep dropping
+ * files in.
  */
 export function IntakeProvider({ children }: { children: React.ReactNode }) {
   const overlay = useOverlay();
+  const [mode] = useMode();
   const openRef = React.useRef(overlay.open);
+  const modeRef = React.useRef(mode);
   React.useEffect(() => {
     openRef.current = overlay.open;
+    modeRef.current = mode;
   });
-  const onJobReady = React.useCallback((jobId: string, _job: JobView) => openRef.current("job", jobId), []);
+  const onJobReady = React.useCallback((jobId: string, _job: JobView) => {
+    if (modeRef.current === "printer") openRef.current("job", jobId);
+  }, []);
   const intake = useIntake(onJobReady);
   const { state } = intake;
 
