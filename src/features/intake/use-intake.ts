@@ -80,8 +80,11 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
           const d = decisions[f.key] ?? "keep";
           if (d === "exclude") excluded.push(f.analysis!.stagingId);
           else if (d === "replace") {
+            // Mirrors the dialog's canReplace exactly: only a registration-ID-confirmed
+            // match supersedes an existing badge — a name-only match on the same file
+            // (if it happens to also carry one) must never sneak into this list.
             const ids = (flaggedByKey.get(f.key)?.flags ?? [])
-              .filter((x) => x.kind === "system" && x.match.type !== "EXACT_FILE" && x.match.type !== "SIMILAR_NAME")
+              .filter((x) => x.kind === "system" && (x.match.type === "SAME_REG_ID" || x.match.type === "NEWER_VERSION"))
               .map((x) => (x.kind === "system" ? x.match.existing.id : ""))
               .filter(Boolean);
             items.push({ stagingId: f.analysis!.stagingId, supersedeCardIds: ids });

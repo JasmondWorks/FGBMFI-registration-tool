@@ -11,7 +11,7 @@ import { CARD_STATUS, exactTime, personLabel, relativeTime } from "@/lib/format"
 import type { CardSummary } from "@/lib/types";
 import { cn, pluralize } from "@/lib/utils";
 import { BadgeImage, cardFileUrl, stagingFileUrl } from "@/features/pdf/pdf-render";
-import { matchesFilter, type FlagFilter } from "./flags";
+import { matchesFilter, strengthOf, type FlagFilter } from "./flags";
 import type { Decision, FlaggedFile, IntakeFile } from "./types";
 
 const FILTERS: { id: FlagFilter; label: string }[] = [
@@ -64,6 +64,11 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
   const pageRows = visible.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
   const fileByKey = new Map(files.map((f) => [f.key, f]));
   const excludedCount = flagged.filter((f) => decisions[f.file.key] === "exclude").length;
+  // A certain match (same file, same registration ID, an older/newer version of the same
+  // ID) left on the silent default would create two live cards for one real badge, with
+  // nothing downstream to stop both printing. Those rows have to be explicitly resolved —
+  // even "Keep both" has to be a real click, not something that just happens by omission.
+  const unresolvedStrong = flagged.filter((f) => strengthOf(f.flags[0]) === 3 && !(f.file.key in decisions));
   const allVisibleSelected = visible.length > 0 && visible.every((f) => selected.has(f.file.key));
   const someVisibleSelected = visible.some((f) => selected.has(f.file.key));
 
@@ -149,11 +154,12 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
             const top = flags[0];
             const existing: { card?: CardSummary; incoming?: IntakeFile } =
               top.kind === "system" ? { card: top.match.existing } : { incoming: fileByKey.get(top.otherKey) };
-            // SIMILAR_NAME is a fuzzy guess for human awareness only — too uncertain to drive
-            // "replace", which marks the existing badge as superseded.
-            const canReplace = flags.some(
-              (f) => f.kind === "system" && f.match.type !== "EXACT_FILE" && f.match.type !== "OLDER_VERSION" && f.match.type !== "SIMILAR_NAME",
-            );
+            // Replace only for matches confirmed by registration ID — a name-only match
+            // (SAME_NAME, SIMILAR_NAME) is too uncertain to drive superseding an existing
+            // badge: it could easily be two different real people who share a name.
+            const canReplace = flags.some((f) => f.kind === "system" && (f.match.type === "SAME_REG_ID" || f.match.type === "NEWER_VERSION"));
+            const isStrong = strengthOf(flags[0]) === 3;
+            const isUnresolved = isStrong && !(file.key in decisions);
             const isSelected = selected.has(file.key);
             return (
               <li
@@ -163,6 +169,7 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
                 className={cn(
                   "grid grid-cols-[auto_1fr] gap-4 px-6 py-4 outline-none focus-visible:bg-accent/40",
                   decision === "exclude" && "bg-muted/60",
+                  isUnresolved && "bg-danger-soft/20",
                 )}
               >
                 <Checkbox className="mt-1" checked={isSelected} onCheckedChange={(v) => toggle(file.key, !!v)} aria-label={`Select ${a.fullName}`} />
@@ -173,6 +180,7 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
                         {f.kind === "system" ? f.match.label : f.label}
                       </Badge>
                     ))}
+                    {isUnresolved && <Badge variant="danger">Needs your decision</Badge>}
                     {decision === "exclude" && <Badge variant="outline">Excluded</Badge>}
                     {decision === "replace" && <Badge variant="info">Will replace the old badge</Badge>}
                   </div>
@@ -222,7 +230,7 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
 
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant={decision === "keep" ? "secondary" : "ghost"} onClick={() => onDecide([file.key], "keep")}>
-                      Keep both (default)
+                      {isStrong ? "Keep both anyway" : "Keep both (default)"}
                     </Button>
                     {canReplace && (
                       <Button size="sm" variant={decision === "replace" ? "default" : "outline"} onClick={() => onDecide([file.key], "replace")}>
@@ -254,6 +262,11 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
             <span className="text-xs text-muted-foreground">
               {excludedCount > 0 ? `${pluralize(excludedCount, "file")} will be excluded` : "Nothing excluded yet"}
             </span>
+            {unresolvedStrong.length > 0 && (
+              <span className="text-xs font-medium text-destructive">
+                {pluralize(unresolvedStrong.length, "exact or ID-matched duplicate")} still {unresolvedStrong.length === 1 ? "needs" : "need"} a decision
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" disabled={selected.size === 0 || saving} onClick={() => onDecide([...selected], "exclude")}>
@@ -262,7 +275,11 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
             <Button variant="outline" disabled={saving} onClick={() => setConfirmAll(true)}>
               Exclude all duplicates
             </Button>
-            <Button disabled={saving} onClick={onContinue}>
+            <Button
+              disabled={saving || unresolvedStrong.length > 0}
+              title={unresolvedStrong.length > 0 ? "Resolve the exact/ID-matched duplicates highlighted below first" : undefined}
+              onClick={onContinue}
+            >
               {saving ? "Saving..." : "Continue"}
             </Button>
           </div>
