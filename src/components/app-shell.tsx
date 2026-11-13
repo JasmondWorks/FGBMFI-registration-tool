@@ -17,13 +17,15 @@ import { JobPreview } from "@/features/preview/job-preview";
 import { ReprintOverlay } from "@/features/reprint/reprint-overlay";
 import { PrintProvider } from "@/features/print/print-provider";
 import { QuickFind } from "@/features/quick-find/quick-find";
+import { TourOverlay } from "@/features/tour/tour-overlay";
+import { TourProvider, useTour } from "@/features/tour/tour-provider";
 import { BadgeViewer } from "@/features/viewer/badge-viewer";
 import { PageViewer } from "@/features/viewer/page-viewer";
 
-const NAV = [
+const NAV: { href: string; label: string; tourId?: string }[] = [
   { href: "/", label: "Print desk" },
-  { href: "/queue", label: "Queue" },
-  { href: "/records", label: "Records" },
+  { href: "/queue", label: "Queue", tourId: "tour-nav-queue" },
+  { href: "/records", label: "Records", tourId: "tour-nav-records" },
   { href: "/reprint", label: "Reprint" },
   { href: "/reconcile", label: "Verify prints" },
   { href: "/settings", label: "Settings" },
@@ -38,14 +40,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <PrintProvider>
             <React.Suspense>
               <IntakeProvider>
-                <div className="flex min-h-dvh flex-col">
-                  <TopBar />
-                  <main className="flex-1">{children}</main>
-                </div>
-                <BadgeViewer />
-                <PageViewer />
-                <JobPreview />
-                <ReprintOverlay />
+                <TourProvider>
+                  <div className="flex min-h-dvh flex-col">
+                    <TopBar />
+                    <main className="flex-1">{children}</main>
+                  </div>
+                  <BadgeViewer />
+                  <PageViewer />
+                  <JobPreview />
+                  <ReprintOverlay />
+                  <TourOverlay />
+                </TourProvider>
               </IntakeProvider>
             </React.Suspense>
           </PrintProvider>
@@ -83,8 +88,13 @@ function TopBar() {
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5 sm:gap-3">
-          <QuickFind />
-          <OperatorPicker />
+          <ReplayTourButton />
+          <div data-tour="tour-quickfind">
+            <QuickFind />
+          </div>
+          <div data-tour="tour-operator">
+            <OperatorPicker />
+          </div>
         </div>
       </div>
 
@@ -124,6 +134,7 @@ function NavLink({
     <Link
       href={item.href}
       onClick={onClick}
+      data-tour={item.tourId}
       aria-current={active ? "page" : undefined}
       className={cn(
         "rounded-md px-3 py-1.5 text-sm transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none",
@@ -133,6 +144,21 @@ function NavLink({
     >
       {item.label}
     </Link>
+  );
+}
+
+function ReplayTourButton() {
+  const { start } = useTour();
+  return (
+    <button
+      type="button"
+      onClick={start}
+      aria-label="Replay the app walkthrough"
+      title="Replay the app walkthrough"
+      className="flex size-9 shrink-0 items-center justify-center rounded-md text-sm font-semibold text-muted-foreground hover:bg-card hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+    >
+      ?
+    </button>
   );
 }
 

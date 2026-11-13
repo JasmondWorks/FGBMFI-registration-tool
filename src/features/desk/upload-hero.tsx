@@ -41,6 +41,7 @@ export function UploadHero() {
   return (
     <section
       {...getRootProps()}
+      data-tour="tour-upload"
       aria-label="Upload badge files"
       className={cn(
         "relative grid overflow-hidden rounded-xl border bg-card transition-colors md:grid-cols-[1fr_auto]",
@@ -55,7 +56,7 @@ export function UploadHero() {
             {isDragActive ? "Release to read the badges" : "Drop the badge files here and the sheets lay themselves out"}
           </h1>
           <p className="max-w-lg text-[15px] leading-relaxed text-muted-foreground">
-            Any number of PDFs from the registration platform. They're checked for duplicates and join the{" "}
+            Any number of PDFs from the registration platform. They&apos;re checked for duplicates and join the{" "}
             <a href="/queue" className="underline underline-offset-2 hover:text-foreground">
               print queue
             </a>
