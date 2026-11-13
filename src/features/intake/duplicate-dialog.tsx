@@ -17,9 +17,9 @@ import type { Decision, FlaggedFile, IntakeFile } from "./types";
 const FILTERS: { id: FlagFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "exact", label: "Exact file" },
-  { id: "person", label: "Same person" },
-  { id: "name", label: "Same name" },
-  { id: "upload", label: "In this upload" },
+  { id: "person", label: "Same registration ID" },
+  { id: "name", label: "Same name (no ID match)" },
+  { id: "upload", label: "Repeated in this upload" },
   { id: "printed", label: "Already printed" },
 ];
 
@@ -90,7 +90,8 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
             {pluralize(flagged.length, "possible duplicate")} in {pluralize(totalFiles, "file")}
           </DialogTitle>
           <DialogDescription>
-            Compare each incoming badge with the one already here. Leaving a file out only removes the new upload, never the record that exists.
+            Each row: your new file on the left, the existing match on the right. "Keep both" is the default — only "Exclude" or
+            "Replace" change anything, and excluding never touches the existing record, only the new upload.
           </DialogDescription>
           <div className="mt-3 flex flex-wrap items-center gap-1" role="tablist" aria-label="Filter duplicates">
             {FILTERS.map((f) => {
@@ -167,7 +168,7 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
                         {f.kind === "system" ? f.match.label : f.label}
                       </Badge>
                     ))}
-                    {decision === "exclude" && <Badge variant="outline">Will be left out</Badge>}
+                    {decision === "exclude" && <Badge variant="outline">Excluded</Badge>}
                     {decision === "replace" && <Badge variant="info">Will replace the old badge</Badge>}
                   </div>
 
@@ -215,16 +216,16 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant={decision === "exclude" ? "default" : "outline"} onClick={() => onDecide([file.key], "exclude")}>
-                      Leave out incoming
+                    <Button size="sm" variant={decision === "keep" ? "secondary" : "ghost"} onClick={() => onDecide([file.key], "keep")}>
+                      Keep both (default)
                     </Button>
                     {canReplace && (
                       <Button size="sm" variant={decision === "replace" ? "default" : "outline"} onClick={() => onDecide([file.key], "replace")}>
-                        Use incoming, retire old
+                        Replace the old one with this
                       </Button>
                     )}
-                    <Button size="sm" variant={decision === "keep" ? "secondary" : "ghost"} onClick={() => onDecide([file.key], "keep")}>
-                      Keep both
+                    <Button size="sm" variant={decision === "exclude" ? "default" : "outline"} onClick={() => onDecide([file.key], "exclude")}>
+                      Exclude this new one
                     </Button>
                   </div>
                 </div>
@@ -246,15 +247,15 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
               </>
             )}
             <span className="text-xs text-muted-foreground">
-              {excludedCount > 0 ? `${pluralize(excludedCount, "file")} will be left out` : "Nothing left out yet"}
+              {excludedCount > 0 ? `${pluralize(excludedCount, "file")} will be excluded` : "Nothing excluded yet"}
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" disabled={selected.size === 0 || saving} onClick={() => onDecide([...selected], "exclude")}>
-              Leave out selected ({selected.size})
+              Exclude selected ({selected.size})
             </Button>
             <Button variant="outline" disabled={saving} onClick={() => setConfirmAll(true)}>
-              Leave out all duplicates
+              Exclude all duplicates
             </Button>
             <Button disabled={saving} onClick={onContinue}>
               {saving ? "Saving..." : "Continue"}
@@ -265,7 +266,7 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
         <AlertDialog open={confirmAll} onOpenChange={setConfirmAll}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Leave out all {flagged.length} flagged files?</AlertDialogTitle>
+              <AlertDialogTitle>Exclude all {flagged.length} flagged files?</AlertDialogTitle>
               <AlertDialogDescription>
                 The incoming copies won&apos;t be added. Badges already in the system stay exactly as they are.
               </AlertDialogDescription>
