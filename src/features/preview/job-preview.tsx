@@ -55,6 +55,35 @@ export function JobPreview() {
   const { printPages, phase, settings, openConfirm } = usePrint();
   const intake = useIntakeContext();
 
+  // A different job: start from its first sheet.
+  const [shownJobId, setShownJobId] = React.useState(jobId);
+  if (jobId !== shownJobId) {
+    setShownJobId(jobId);
+    setSelectedId(null);
+    setSlot(1);
+    setFilter("all");
+    setFix(null);
+  }
+
+  // Nothing left to do in this job (every page confirmed one way or another, nothing
+  // unplaced) — auto-close, but only on the transition into that state, never just
+  // because the job already happened to be fully resolved when it was opened ("Open its
+  // print preview" on a page viewer works on any historical page, confirmed or not).
+  // Refs are read/written only inside the effect — never during render.
+  const hadPendingWork = React.useRef<boolean | null>(null);
+  const lastJobId = React.useRef(jobId);
+  React.useEffect(() => {
+    if (lastJobId.current !== jobId) {
+      lastJobId.current = jobId;
+      hadPendingWork.current = null;
+    }
+    if (!job) return;
+    const pending = job.pages.some((p) => p.status === "READY" || p.status === "SENT" || p.status === "SPOOLED") || job.unplaced.length > 0;
+    if (hadPendingWork.current === true && !pending) overlay.close("job");
+    hadPendingWork.current = pending;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId, job?.pages, job?.unplaced]);
+
   async function discardSheet(page: PageView) {
     setDiscardBusy(true);
     try {
@@ -69,16 +98,6 @@ export function JobPreview() {
     } finally {
       setDiscardBusy(false);
     }
-  }
-
-  // A different job: start from its first sheet.
-  const [shownJobId, setShownJobId] = React.useState(jobId);
-  if (jobId !== shownJobId) {
-    setShownJobId(jobId);
-    setSelectedId(null);
-    setSlot(1);
-    setFilter("all");
-    setFix(null);
   }
 
   const pages = job?.pages ?? [];
