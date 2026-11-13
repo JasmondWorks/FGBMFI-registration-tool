@@ -116,6 +116,13 @@ function TopBar({ mode }: { mode: DeskMode }) {
           <Link href="/" className="flex min-w-0 shrink items-center gap-2.5 focus-visible:outline-none">
             <Wordmark compact />
           </Link>
+
+          {/* Below 1280px the real switcher lives in the sidebar, not the topbar — but
+              which mode this device is in should still be visible at a glance without
+              opening that drawer, and a one-word pill costs almost no width to do it. */}
+          <span className="hidden shrink-0 rounded-full border bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize min-[400px]:inline min-[1280px]:hidden">
+            {mode}
+          </span>
         </div>
 
         <nav
