@@ -11,6 +11,15 @@ import path from "node:path";
  *   storage/staging/<id>.<ext> + <id>.json   files analysed but not yet accepted
  *   storage/badges/<yyyy-mm-dd>/<cardId>.<ext>  accepted badge files
  */
+// This desk app only works pointed at a laptop with a persistent local disk — Vercel's
+// filesystem is ephemeral per invocation, so files written by one request can silently
+// be gone for the next. Fail loudly here instead of quietly losing badge files.
+if (process.env.VERCEL) {
+  throw new Error(
+    "This app stores badge files on local disk and can't run on Vercel — files would silently disappear. Run it on the desk laptop instead.",
+  );
+}
+
 const ROOT = path.resolve(process.env.STORAGE_DIR || "./storage");
 const STAGING = path.join(ROOT, "staging");
 const BADGES = path.join(ROOT, "badges");
