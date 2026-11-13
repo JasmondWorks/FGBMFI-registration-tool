@@ -72,17 +72,25 @@ export function PrintProvider({ children }: { children: React.ReactNode }) {
       iframe.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;";
       iframe.src = url;
       iframe.onload = () => {
+        // The iframe's load event fires on the outer document, not once the embedded PDF
+        // viewer has actually finished rendering — 400ms was a guess at that gap, too
+        // short on a slower machine or a heavier sheet. Longer, still bounded.
         window.setTimeout(() => {
           try {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
+            // contentWindow can be null here (sandboxing, a slow/evicted frame) — with
+            // optional chaining alone that's a silent no-op: nothing prints, nothing
+            // throws, and this still resolves as if it worked. Treat it as the same
+            // failure as the catch below, not a quiet success.
+            if (!iframe.contentWindow) throw new Error("The print frame wasn't ready");
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
             resolve();
           } catch (err) {
             // Some browsers block printing PDFs from frames: open it in a tab instead.
             window.open(url, "_blank");
             reject(err);
           }
-        }, 400);
+        }, 700);
       };
       document.body.appendChild(iframe);
       frame.current = iframe;
