@@ -75,7 +75,7 @@ export function useIntake(onJobReady: (jobId: string, job: JobView) => void) {
           if (d === "exclude") excluded.push(f.analysis!.stagingId);
           else if (d === "replace") {
             const ids = (flaggedByKey.get(f.key)?.flags ?? [])
-              .filter((x) => x.kind === "system" && x.match.type !== "EXACT_FILE")
+              .filter((x) => x.kind === "system" && x.match.type !== "EXACT_FILE" && x.match.type !== "SIMILAR_NAME")
               .map((x) => (x.kind === "system" ? x.match.existing.id : ""))
               .filter(Boolean);
             items.push({ stagingId: f.analysis!.stagingId, supersedeCardIds: ids });

@@ -82,3 +82,35 @@ export function namesMatch(a: string | null | undefined, b: string | null | unde
   for (const t of small) if (!large.has(t)) return false;
   return true;
 }
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    const row = [i];
+    for (let j = 1; j <= n; j++) {
+      row[j] = a[i - 1] === b[j - 1] ? prev[j - 1] : 1 + Math.min(prev[j - 1], prev[j], row[j - 1]);
+    }
+    prev = row;
+  }
+  return prev[n];
+}
+
+/**
+ * True when two already-normalized name keys are close enough to plausibly be the same
+ * name with a typo (not an exact match — that's nameKey equality, handled separately),
+ * e.g. a registration re-done to fix a misspelling. Deliberately loose: a few edits
+ * allowed relative to length, which will also catch some genuinely different short names
+ * — that's why this is surfaced for a human to judge, never auto-applied.
+ */
+export function nameKeysLookSimilar(ka: string, kb: string): boolean {
+  if (!ka || !kb || ka === kb) return false;
+  if (ka.length < 6 || kb.length < 6) return false; // too short for edit-distance to mean much
+  const distance = levenshtein(ka, kb);
+  const maxLen = Math.max(ka.length, kb.length);
+  return distance <= 2 && distance / maxLen < 0.25;
+}

@@ -40,7 +40,7 @@ export function strengthOf(flag: FlaggedFile["flags"][number]) {
   return flag.kind === "system" ? flag.match.strength : flag.strength;
 }
 
-export type FlagFilter = "all" | "exact" | "person" | "name" | "upload" | "printed";
+export type FlagFilter = "all" | "exact" | "person" | "name" | "similar" | "upload" | "printed";
 
 export function matchesFilter(f: FlaggedFile, filter: FlagFilter) {
   if (filter === "all") return true;
@@ -51,6 +51,7 @@ export function matchesFilter(f: FlaggedFile, filter: FlagFilter) {
     if (filter === "exact") return t === "EXACT_FILE";
     if (filter === "person") return t === "SAME_REG_ID" || t === "NEWER_VERSION" || t === "OLDER_VERSION";
     if (filter === "name") return t === "SAME_NAME";
+    if (filter === "similar") return t === "SIMILAR_NAME";
     if (filter === "printed") return flag.match.existing.printCount > 0;
     return false;
   });

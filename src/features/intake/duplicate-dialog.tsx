@@ -19,6 +19,7 @@ const FILTERS: { id: FlagFilter; label: string }[] = [
   { id: "exact", label: "Exact file" },
   { id: "person", label: "Same registration ID" },
   { id: "name", label: "Same name (no ID match)" },
+  { id: "similar", label: "Possible typo (similar name)" },
   { id: "upload", label: "Repeated in this upload" },
   { id: "printed", label: "Already printed" },
 ];
@@ -90,8 +91,8 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
             {pluralize(flagged.length, "possible duplicate")} in {pluralize(totalFiles, "file")}
           </DialogTitle>
           <DialogDescription>
-            Each row: your new file on the left, the existing match on the right. "Keep both" is the default — only "Exclude" or
-            "Replace" change anything, and excluding never touches the existing record, only the new upload.
+            Each row: your new file on the left, the existing match on the right. &ldquo;Keep both&rdquo; is the default — only
+            &ldquo;Exclude&rdquo; or &ldquo;Replace&rdquo; change anything, and excluding never touches the existing record, only the new upload.
           </DialogDescription>
           <div className="mt-3 flex flex-wrap items-center gap-1" role="tablist" aria-label="Filter duplicates">
             {FILTERS.map((f) => {
@@ -148,7 +149,11 @@ export function DuplicateDialog({ open, totalFiles, files, flagged, decisions, s
             const top = flags[0];
             const existing: { card?: CardSummary; incoming?: IntakeFile } =
               top.kind === "system" ? { card: top.match.existing } : { incoming: fileByKey.get(top.otherKey) };
-            const canReplace = flags.some((f) => f.kind === "system" && f.match.type !== "EXACT_FILE" && f.match.type !== "OLDER_VERSION");
+            // SIMILAR_NAME is a fuzzy guess for human awareness only — too uncertain to drive
+            // "replace", which marks the existing badge as superseded.
+            const canReplace = flags.some(
+              (f) => f.kind === "system" && f.match.type !== "EXACT_FILE" && f.match.type !== "OLDER_VERSION" && f.match.type !== "SIMILAR_NAME",
+            );
             const isSelected = selected.has(file.key);
             return (
               <li

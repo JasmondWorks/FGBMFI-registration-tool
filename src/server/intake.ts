@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq, inArray, ne, notInArray, or } from "drizzle-orm";
 
+import { nameKeysLookSimilar } from "@/lib/badge/normalize";
 import type { AnalyzedFile, DuplicateMatch } from "@/lib/types";
 import { logEvents, type AuditInput } from "./audit";
 import { queueCloudSync, isCloudEnabled } from "./cloudinary";
@@ -104,6 +105,23 @@ export async function findDuplicates(x: Pick<Extraction, "fileHash" | "registrat
       existing,
     });
   }
+
+  // A typo'd registration has to be fixed by registering again on the platform, which
+  // gives it a brand new registration ID and (intentionally) a different name — so it
+  // matches none of the exact checks above. Bounded to the same chapter: cheap, and the
+  // realistic case (same attendee, same event) almost always still has one.
+  if (x.chapter && matches.length === 0) {
+    const candidates = await db.query.cards.findMany({
+      where: and(eq(cards.chapter, x.chapter), ne(cards.status, "DISCARDED"), ne(cards.status, "SUPERSEDED"), ne(cards.nameKey, x.nameKey)),
+      limit: 200,
+    });
+    for (const row of candidates) {
+      if (nameKeysLookSimilar(x.nameKey, row.nameKey)) {
+        matches.push({ type: "SIMILAR_NAME", strength: 1, label: "Name looks similar — possible typo'd re-registration", existing: toCardSummary(row) });
+      }
+    }
+  }
+
   return matches.sort((a, b) => b.strength - a.strength);
 }
 

@@ -36,7 +36,7 @@ export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
   printerName: null,
 };
 
-export type DuplicateMatchType = "EXACT_FILE" | "SAME_REG_ID" | "NEWER_VERSION" | "OLDER_VERSION" | "SAME_NAME";
+export type DuplicateMatchType = "EXACT_FILE" | "SAME_REG_ID" | "NEWER_VERSION" | "OLDER_VERSION" | "SAME_NAME" | "SIMILAR_NAME";
 
 export type CardSummary = {
   id: string;
