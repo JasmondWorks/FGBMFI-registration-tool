@@ -3,15 +3,15 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { v2 as cloudinary } from "cloudinary";
 
-import { logEvent } from "./audit";
 import { db } from "./db";
 import { cards } from "./db/schema";
-import { readStoredFile } from "./storage";
 
 /**
- * Cloudinary keeps an off-site copy of every badge. It never blocks the desk:
- * uploads run in the background after a file is accepted, retry with backoff,
- * and a failed sync is shown in the UI with a retry button.
+ * Cloudinary is the durable copy of every badge file — not a backup. Local disk is only
+ * ever a same-request convenience (nothing later can rely on it surviving), so a badge
+ * isn't considered saved until this succeeds. Called synchronously during commit, not
+ * queued in the background, so a failure surfaces to the operator immediately instead of
+ * quietly leaving a card with nowhere its file actually lives.
  */
 
 export function isCloudEnabled() {
@@ -26,75 +26,51 @@ function configure() {
   configured = true;
 }
 
-const MAX_CONCURRENT = 4;
 const MAX_TRIES = 3;
-let running = 0;
-const queue: string[] = [];
-const queued = new Set<string>();
 
-/** Queue cards for upload. Safe to call many times for the same card. */
-export function queueCloudSync(cardIds: string[]) {
-  if (!isCloudEnabled()) return;
-  for (const id of cardIds) {
-    if (queued.has(id)) continue;
-    queued.add(id);
-    queue.push(id);
-  }
-  pump();
-}
-
-function pump() {
-  while (running < MAX_CONCURRENT && queue.length > 0) {
-    const id = queue.shift()!;
-    running++;
-    syncCard(id)
-      .catch(() => undefined)
-      .finally(() => {
-        running--;
-        queued.delete(id);
-        pump();
-      });
-  }
-}
-
-async function syncCard(cardId: string) {
+/** Uploads one badge file's bytes to Cloudinary. Throws if it never succeeds. */
+export async function uploadCardFile(
+  cardId: string,
+  bytes: Uint8Array,
+  createdAt: Date,
+  context: { fullName: string; registrationId: string | null },
+): Promise<{ publicId: string; url: string }> {
+  if (!isCloudEnabled()) throw new Error("Cloud storage isn't configured (CLOUDINARY_URL is missing)");
   configure();
-  const card = await db.query.cards.findFirst({ where: eq(cards.id, cardId) });
-  if (!card || card.cloudStatus === "SYNCED") return;
-  const bytes = await readStoredFile(card.localPath);
-  if (!bytes) {
-    await db.update(cards).set({ cloudStatus: "FAILED", cloudError: "Local file missing" }).where(eq(cards.id, cardId));
-    return;
-  }
+  const day = createdAt.toISOString().slice(0, 10);
 
   let lastError = "";
   for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
     try {
-      const day = card.createdAt.toISOString().slice(0, 10);
       const result = await new Promise<{ public_id: string; secure_url: string }>((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
           {
             folder: `namecard-desk/${day}`,
-            public_id: card.id,
+            public_id: cardId,
             resource_type: "image", // PDFs are "image" resources, which allows page previews
             overwrite: false,
-            context: { full_name: card.fullName, registration_id: card.registrationId ?? "" },
+            context: { full_name: context.fullName, registration_id: context.registrationId ?? "" },
           },
           (err, res) => (err || !res ? reject(err ?? new Error("No response")) : resolve(res)),
         );
         stream.end(bytes);
       });
-      await db
-        .update(cards)
-        .set({ cloudStatus: "SYNCED", cloudinaryPublicId: result.public_id, cloudinaryUrl: result.secure_url, cloudError: null })
-        .where(eq(cards.id, cardId));
-      await logEvent({ type: "CLOUD_SYNCED", actor: "system", cardId, payload: { publicId: result.public_id } });
-      return;
+      return { publicId: result.public_id, url: result.secure_url };
     } catch (err) {
       lastError = err instanceof Error ? err.message : String((err as { message?: string })?.message ?? err);
       if (attempt < MAX_TRIES) await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
     }
   }
-  await db.update(cards).set({ cloudStatus: "FAILED", cloudError: lastError.slice(0, 500) }).where(eq(cards.id, cardId));
-  await logEvent({ type: "CLOUD_FAILED", actor: "system", cardId, payload: { error: lastError.slice(0, 500) } });
+  throw new Error(lastError || "Cloud upload failed");
+}
+
+/**
+ * A card can only be FAILED/PENDING now if it predates this migration (new uploads never
+ * leave commit without a working cloud copy — see intake.ts). There's no bytes left to
+ * retry with for those, so this just reports how many are stuck rather than pretending
+ * to fix them.
+ */
+export async function retryCloudSync() {
+  const rows = await db.query.cards.findMany({ where: eq(cards.cloudStatus, "FAILED"), columns: { id: true } });
+  return rows.length;
 }

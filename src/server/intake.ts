@@ -5,7 +5,7 @@ import { and, eq, inArray, ne, notInArray, or } from "drizzle-orm";
 import { nameKeysLookSimilar } from "@/lib/badge/normalize";
 import type { AnalyzedFile, DuplicateMatch } from "@/lib/types";
 import { logEvents, type AuditInput } from "./audit";
-import { queueCloudSync, isCloudEnabled } from "./cloudinary";
+import { isCloudEnabled, retryCloudSync as retryCloudSyncImpl, uploadCardFile } from "./cloudinary";
 import { db } from "./db";
 import { cards, jobs, type Card } from "./db/schema";
 import { extractBadge, type Extraction } from "./extract";
@@ -15,10 +15,12 @@ import {
   ALLOWED_MIME_TYPES,
   MAX_FILE_BYTES,
   discardStaging,
-  promoteStaging,
+  readStagingFile,
   readStagingMeta,
   saveStaging,
 } from "./storage";
+
+const UPLOAD_CONCURRENCY = 4;
 
 type StagingMeta = { originalFilename: string; sizeBytes: number; extraction: Omit<Extraction, "badgeGeneratedAt"> & { badgeGeneratedAt: string | null } };
 
@@ -165,13 +167,36 @@ export async function commitIntake(input: {
     return { jobId: input.jobId ?? null, cardIds: [] as string[] };
   }
 
-  const metas: { item: CommitItem; meta: StagingMeta & { ext: string; mime: string } }[] = [];
-  for (const item of items) {
-    const meta = await readStagingMeta<StagingMeta>(item.stagingId);
-    if (!meta) throw new UserError("Some files expired before they were accepted. Please upload them again.");
-    metas.push({ item, meta });
-  }
+  if (!isCloudEnabled()) throw new UserError("Cloud storage isn't configured (CLOUDINARY_URL is missing) — badges can't be saved.");
 
+  type Prepared = { item: CommitItem; meta: StagingMeta & { ext: string; mime: string }; cardId: string; cloud: { publicId: string; url: string } };
+  const prepared: Prepared[] = new Array(items.length);
+  // Uploading to Cloudinary is the thing that makes a badge durable, so it happens before
+  // any database write, with limited concurrency so a batch of a few hundred files doesn't
+  // open a few hundred uploads at once. If any file fails, nothing is committed — the
+  // staged files are untouched, so the operator just tries "Continue" again.
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      const item = items[i];
+      const meta = await readStagingMeta<StagingMeta>(item.stagingId);
+      if (!meta) throw new UserError("Some files expired before they were accepted. Please upload them again.");
+      const staged = await readStagingFile(item.stagingId);
+      if (!staged) throw new UserError("Some files expired before they were accepted. Please upload them again.");
+      const cardId = crypto.randomUUID();
+      const cloud = await uploadCardFile(cardId, staged.bytes, new Date(), {
+        fullName: meta.extraction.fullName,
+        registrationId: meta.extraction.registrationId,
+      }).catch((err) => {
+        throw new UserError(`Couldn't save ${meta.originalFilename} to cloud storage: ${err instanceof Error ? err.message : "unknown error"}. Nothing was committed — try again.`);
+      });
+      prepared[i] = { item, meta, cardId, cloud };
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, items.length) }, worker));
+
+  const metas = prepared;
   const result = await db.transaction(async (tx) => {
     let jobId = input.jobId ?? null;
     const events: AuditInput[] = [...exclusionEvents];
@@ -196,10 +221,8 @@ export async function commitIntake(input: {
     const base = Date.now();
     const created: Card[] = [];
     for (let i = 0; i < metas.length; i++) {
-      const { item, meta } = metas[i];
+      const { item, meta, cardId: id, cloud } = metas[i];
       const x = meta.extraction;
-      const id = crypto.randomUUID();
-      const localPath = await promoteStaging(item.stagingId, id, meta.ext);
       const [card] = await tx
         .insert(cards)
         .values({
@@ -209,10 +232,11 @@ export async function commitIntake(input: {
           fileHash: x.fileHash,
           mimeType: meta.mime,
           sizeBytes: meta.sizeBytes,
-          localPath,
           pageWidthPt: x.pageWidthPt,
           pageHeightPt: x.pageHeightPt,
-          cloudStatus: isCloudEnabled() ? "PENDING" : "DISABLED",
+          cloudStatus: "SYNCED",
+          cloudinaryPublicId: cloud.publicId,
+          cloudinaryUrl: cloud.url,
           titles: x.titles,
           postNominals: x.postNominals,
           fullName: x.fullName,
@@ -274,15 +298,11 @@ export async function commitIntake(input: {
     return { jobId: jobId!, cardIds: created.map((c) => c.id) };
   });
 
-  queueCloudSync(result.cardIds);
+  // Only clean up staging now that the cards are durably committed — a failed transaction
+  // above (e.g. the "page hasn't been confirmed yet" guard) leaves staged files alone so
+  // nothing already-uploaded-to-Cloudinary is orphaned without a card to show for it.
+  await Promise.all(prepared.map((p) => discardStaging(p.item.stagingId)));
   return result;
 }
 
-export async function retryCloudSync() {
-  const rows = await db
-    .select({ id: cards.id })
-    .from(cards)
-    .where(inArray(cards.cloudStatus, ["FAILED", "PENDING"]));
-  queueCloudSync(rows.map((r) => r.id));
-  return rows.length;
-}
+export const retryCloudSync = retryCloudSyncImpl;

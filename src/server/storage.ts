@@ -1,28 +1,18 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { eq, lt } from "drizzle-orm";
+
+import { db } from "./db";
+import { stagingFiles } from "./db/schema";
 
 /**
- * Local file storage on the desk laptop. Printing always reads from here, so the
- * desk keeps working if the venue internet drops. Cloudinary is a backup copy.
- *
- *   storage/staging/<id>.<ext> + <id>.json   files analysed but not yet accepted
- *   storage/badges/<yyyy-mm-dd>/<cardId>.<ext>  accepted badge files
+ * Staged files (uploaded, read, but not yet accepted into a card) live in Postgres,
+ * not local disk: the duplicate-review step in between can take a while and is a
+ * separate request from the one that analyzed the file, so it has to survive across
+ * requests landing on different server instances. Accepted badge files go straight to
+ * Cloudinary (see cloudinary.ts) for the same reason — nothing about serving a badge
+ * can depend on the request that uploaded it still being the one answering later.
  */
-// This desk app only works pointed at a laptop with a persistent local disk — Vercel's
-// filesystem is ephemeral per invocation, so files written by one request can silently
-// be gone for the next. Fail loudly here instead of quietly losing badge files.
-if (process.env.VERCEL) {
-  throw new Error(
-    "This app stores badge files on local disk and can't run on Vercel — files would silently disappear. Run it on the desk laptop instead.",
-  );
-}
-
-const ROOT = path.resolve(process.env.STORAGE_DIR || "./storage");
-const STAGING = path.join(ROOT, "staging");
-const BADGES = path.join(ROOT, "badges");
 const STAGING_TTL_MS = 24 * 60 * 60 * 1000;
 
 const EXT_BY_MIME: Record<string, string> = {
@@ -40,71 +30,39 @@ export function extensionFor(mime: string) {
   return ext;
 }
 
-function isSafeId(id: string) {
-  return /^[a-f0-9-]{36}$/i.test(id);
-}
-
 export async function saveStaging<M extends object>(bytes: Uint8Array, mime: string, meta: M) {
-  await fs.mkdir(STAGING, { recursive: true });
-  const id = randomUUID();
   const ext = extensionFor(mime);
-  await fs.writeFile(path.join(STAGING, `${id}.${ext}`), bytes);
-  await fs.writeFile(path.join(STAGING, `${id}.json`), JSON.stringify({ ...meta, ext, mime }));
+  const [row] = await db
+    .insert(stagingFiles)
+    .values({ bytes: Buffer.from(bytes), mime, ext, meta: { ...meta, ext, mime } })
+    .returning({ id: stagingFiles.id });
   void cleanupStaging();
-  return id;
+  return row.id;
 }
 
 export async function readStagingMeta<M>(id: string): Promise<(M & { ext: string; mime: string }) | null> {
-  if (!isSafeId(id)) return null;
-  try {
-    const raw = await fs.readFile(path.join(STAGING, `${id}.json`), "utf8");
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  const row = await db.query.stagingFiles.findFirst({ where: eq(stagingFiles.id, id), columns: { meta: true } });
+  return (row?.meta as (M & { ext: string; mime: string }) | undefined) ?? null;
 }
 
 export async function readStagingFile(id: string): Promise<{ bytes: Buffer; mime: string } | null> {
-  const meta = await readStagingMeta<object>(id);
-  if (!meta) return null;
-  try {
-    const bytes = await fs.readFile(path.join(STAGING, `${id}.${meta.ext}`));
-    return { bytes, mime: meta.mime };
-  } catch {
-    return null;
-  }
-}
-
-/** Moves a staged file into permanent storage and returns its path relative to the storage root. */
-export async function promoteStaging(stagingId: string, cardId: string, ext: string): Promise<string> {
-  const day = new Date().toISOString().slice(0, 10);
-  const dir = path.join(BADGES, day);
-  await fs.mkdir(dir, { recursive: true });
-  const rel = path.join("badges", day, `${cardId}.${ext}`);
-  await fs.rename(path.join(STAGING, `${stagingId}.${ext}`), path.join(ROOT, rel));
-  await fs.rm(path.join(STAGING, `${stagingId}.json`), { force: true });
-  return rel;
+  const row = await db.query.stagingFiles.findFirst({ where: eq(stagingFiles.id, id), columns: { bytes: true, mime: true } });
+  return row ? { bytes: row.bytes, mime: row.mime } : null;
 }
 
 export async function discardStaging(id: string) {
-  const meta = await readStagingMeta<object>(id);
-  if (!meta) return;
-  await fs.rm(path.join(STAGING, `${id}.${meta.ext}`), { force: true });
-  await fs.rm(path.join(STAGING, `${id}.json`), { force: true });
+  await db.delete(stagingFiles).where(eq(stagingFiles.id, id));
 }
 
-export async function readStoredFile(relPath: string): Promise<Buffer | null> {
-  const full = path.resolve(ROOT, relPath);
-  if (!full.startsWith(ROOT + path.sep)) return null; // never escape the storage root
+/** Fetches bytes from wherever the card's badge actually lives (Cloudinary, the only durable copy). */
+export async function fetchCardBytes(cloudinaryUrl: string): Promise<Buffer | null> {
   try {
-    return await fs.readFile(full);
+    const res = await fetch(cloudinaryUrl);
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer());
   } catch {
     return null;
   }
-}
-
-export function absoluteStoredPath(relPath: string) {
-  return path.resolve(ROOT, relPath);
 }
 
 let lastCleanup = 0;
@@ -113,11 +71,7 @@ async function cleanupStaging() {
   if (now - lastCleanup < 60 * 60 * 1000) return;
   lastCleanup = now;
   try {
-    for (const name of await fs.readdir(STAGING)) {
-      const p = path.join(STAGING, name);
-      const stat = await fs.stat(p);
-      if (now - stat.mtimeMs > STAGING_TTL_MS) await fs.rm(p, { force: true });
-    }
+    await db.delete(stagingFiles).where(lt(stagingFiles.createdAt, new Date(now - STAGING_TTL_MS)));
   } catch {
     // best effort
   }

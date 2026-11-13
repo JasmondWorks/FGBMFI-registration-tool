@@ -158,7 +158,9 @@ export async function confirmDispatched(cardIds: string[], operator: string) {
 /** Adds a badge that wasn't in the system at all, discovered by reconciliation: its file is
  *  uploaded like normal intake, but it's saved straight to PRINTED since it's already out. */
 export async function addReconciledCard(input: { stagingId: string; operator: string }) {
-  const { readStagingMeta, promoteStaging } = await import("./storage");
+  const { readStagingMeta, readStagingFile, discardStaging } = await import("./storage");
+  const { isCloudEnabled, uploadCardFile } = await import("./cloudinary");
+  if (!isCloudEnabled()) throw new UserError("Cloud storage isn't configured (CLOUDINARY_URL is missing) — badges can't be saved.");
   type StagingMeta = {
     originalFilename: string;
     sizeBytes: number;
@@ -189,11 +191,15 @@ export async function addReconciledCard(input: { stagingId: string; operator: st
   };
   const meta = await readStagingMeta<StagingMeta>(input.stagingId);
   if (!meta) throw new UserError("That file expired before it was added. Please upload it again.");
+  const staged = await readStagingFile(input.stagingId);
+  if (!staged) throw new UserError("That file expired before it was added. Please upload it again.");
 
   const id = crypto.randomUUID();
-  const localPath = await promoteStaging(input.stagingId, id, meta.ext);
-  const x = meta.extraction;
   const now = new Date();
+  const x = meta.extraction;
+  const cloud = await uploadCardFile(id, staged.bytes, now, { fullName: x.fullName, registrationId: x.registrationId }).catch((err) => {
+    throw new UserError(`Couldn't save this file to cloud storage: ${err instanceof Error ? err.message : "unknown error"}. Nothing was added — try again.`);
+  });
   const [card] = await db
     .insert(cards)
     .values({
@@ -203,7 +209,9 @@ export async function addReconciledCard(input: { stagingId: string; operator: st
       fileHash: x.fileHash,
       mimeType: meta.mime,
       sizeBytes: meta.sizeBytes,
-      localPath,
+      cloudStatus: "SYNCED",
+      cloudinaryPublicId: cloud.publicId,
+      cloudinaryUrl: cloud.url,
       pageWidthPt: x.pageWidthPt,
       pageHeightPt: x.pageHeightPt,
       titles: x.titles,
@@ -233,6 +241,7 @@ export async function addReconciledCard(input: { stagingId: string; operator: st
       updatedAt: now,
     })
     .returning();
+  await discardStaging(input.stagingId);
 
   await logEvents([
     {

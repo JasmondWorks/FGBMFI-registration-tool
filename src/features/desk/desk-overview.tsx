@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/misc";
 import { api, errorMessage } from "@/lib/api";
 import { useFetch } from "@/lib/events";
@@ -18,13 +19,14 @@ type Overview = {
   counts: { uploadedToday: number; printedToday: number; printedTotal: number; notPrinted: number; needsReview: number; cloudFailed: number };
   waiting: PageView[];
   recent: PageView[];
-  openJobs: { id: string; kind: "UPLOAD" | "REPRINT"; createdAt: string; readyPages: number }[];
+  openJobs: { id: string; kind: "UPLOAD" | "REPRINT"; operator: string; createdAt: string; readyPages: number; names: string[] }[];
 };
 
 export function DeskOverview() {
   const { data, error } = useFetch("overview", () => api<Overview>("/api/overview"));
   const overlay = useOverlay();
   const { openConfirm } = usePrint();
+  const [jobSearch, setJobSearch] = React.useState("");
 
   if (error && !data) return <p className="text-sm text-destructive">{error}</p>;
   if (!data) {
@@ -90,21 +92,57 @@ export function DeskOverview() {
             {data.openJobs.length === 0 ? (
               <Empty>Nothing built and waiting. New uploads print themselves once a sheet is full.</Empty>
             ) : (
-              <ul className="divide-y rounded-md border bg-card">
-                {data.openJobs.map((j) => (
-                  <li key={j.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <span className="flex flex-col">
-                      <span className="text-sm font-medium">
-                        {j.kind === "REPRINT" ? "Reprint" : "Upload"} · {pluralize(j.readyPages, "sheet")}
-                      </span>
-                      <span className="text-xs text-muted-foreground">Started {shortTime(j.createdAt)}</span>
-                    </span>
-                    <Button size="sm" onClick={() => overlay.open("job", j.id)}>
-                      Open
-                    </Button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                {data.openJobs.length > 1 && (
+                  <Input
+                    value={jobSearch}
+                    onChange={(e) => setJobSearch(e.target.value)}
+                    placeholder="Find a sheet by name — someone waiting at the desk?"
+                    className="h-9"
+                  />
+                )}
+                {(() => {
+                  const q = jobSearch.trim().toLowerCase();
+                  const visible = q ? data.openJobs.filter((j) => j.names.some((n) => n.toLowerCase().includes(q))) : data.openJobs;
+                  if (visible.length === 0) {
+                    return <Empty>No waiting sheet has a name matching &ldquo;{jobSearch}&rdquo;. It may already be printed, or still in the Queue.</Empty>;
+                  }
+                  return (
+                    <ul className="divide-y rounded-md border bg-card">
+                      {visible.map((j) => {
+                        const match = q ? j.names.find((n) => n.toLowerCase().includes(q)) : null;
+                        const shown = match ? [match, ...j.names.filter((n) => n !== match)] : j.names;
+                        return (
+                          <li key={j.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                            <span className="flex min-w-0 flex-col">
+                              <span className="text-sm font-medium">
+                                {j.kind === "REPRINT" ? "Reprint" : "Upload"} · {pluralize(j.readyPages, "sheet")} · {j.operator}
+                              </span>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {match ? (
+                                  <>
+                                    <mark className="rounded-sm bg-[oklch(0.9_0.08_95)] px-0.5 text-foreground">{match}</mark>
+                                    {shown.length > 1 ? `, ${shown.slice(1, 3).join(", ")}` : ""}
+                                  </>
+                                ) : shown.length > 0 ? (
+                                  shown.slice(0, 3).join(", ")
+                                ) : (
+                                  "No badges on these sheets yet"
+                                )}
+                                {shown.length > 3 ? ", …" : ""}
+                              </span>
+                              <span className="text-xs text-muted-foreground">Started {shortTime(j.createdAt)}</span>
+                            </span>
+                            <Button size="sm" onClick={() => overlay.open("job", j.id)}>
+                              Open
+                            </Button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  );
+                })()}
+              </>
             )}
           </section>
         </div>
@@ -122,7 +160,7 @@ export function DeskOverview() {
             )}
           </SectionHead>
           {data.waiting.length === 0 ? (
-            <Empty>Nothing to confirm. Every printed sheet's been checked against what came out.</Empty>
+            <Empty>Nothing to confirm. Every printed sheet&apos;s been checked against what came out.</Empty>
           ) : (
             <ul className="divide-y rounded-md border bg-card">
               {data.waiting.map((p) => (

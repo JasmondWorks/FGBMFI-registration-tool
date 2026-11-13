@@ -506,17 +506,43 @@ export async function getDeskOverview() {
     .orderBy(desc(sql`coalesce(${pages.confirmedAt}, ${pages.sentAt}, ${pages.createdAt})`))
     .limit(6);
   const openJobs = await db
-    .select({ id: jobs.id, kind: jobs.kind, createdAt: jobs.createdAt, ready: sql<number>`count(${pages.id})` })
+    .select({ id: jobs.id, kind: jobs.kind, operator: jobs.operator, createdAt: jobs.createdAt, ready: sql<number>`count(${pages.id})` })
     .from(jobs)
     .innerJoin(pages, and(eq(pages.jobId, jobs.id), eq(pages.status, "READY")))
     .groupBy(jobs.id)
     .orderBy(desc(jobs.createdAt))
     .limit(5);
+
+  // A couple of names from each open job, so "Upload · 2 sheets" is recognizable at a
+  // glance instead of every row looking the same.
+  const namesByJob = new Map<string, string[]>();
+  if (openJobs.length > 0) {
+    const nameRows = await db
+      .select({ jobId: pages.jobId, fullName: cards.fullName })
+      .from(pageItems)
+      .innerJoin(pages, eq(pages.id, pageItems.pageId))
+      .innerJoin(cards, eq(cards.id, pageItems.cardId))
+      .where(and(inArray(pages.jobId, openJobs.map((j) => j.id)), eq(pages.status, "READY")))
+      .orderBy(asc(pages.pageNumber), asc(pageItems.slot));
+    for (const r of nameRows) {
+      const list = namesByJob.get(r.jobId) ?? [];
+      list.push(r.fullName);
+      namesByJob.set(r.jobId, list);
+    }
+  }
+
   return {
     counts: Object.fromEntries(Object.entries(counts).map(([k, v]) => [k, Number(v)])) as Record<keyof typeof counts, number>,
     waiting: await getPageViews(waiting.map((w) => w.id)),
     recent: await getPageViews(recent.map((r) => r.id)),
-    openJobs: openJobs.map((j) => ({ id: j.id, kind: j.kind, createdAt: j.createdAt.toISOString(), readyPages: Number(j.ready) })),
+    openJobs: openJobs.map((j) => ({
+      id: j.id,
+      kind: j.kind,
+      operator: j.operator,
+      createdAt: j.createdAt.toISOString(),
+      readyPages: Number(j.ready),
+      names: namesByJob.get(j.id) ?? [],
+    })),
   };
 }
 

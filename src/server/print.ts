@@ -9,14 +9,17 @@ import { assertPrintable, markSent, markSpooled } from "./pages";
 import { getSpoolStatus, printPdf } from "./print-agent";
 import { getPrintSettings } from "./settings";
 import { buildSheetsPdf, type SheetPage } from "./sheet-pdf";
-import { readStoredFile } from "./storage";
+import { fetchCardBytes } from "./storage";
 
 /** Loads the badge files for the given pages and builds one PDF with one A4 sheet per page. */
 export async function buildPagesPdf(pageIds: string[]) {
   const views = await assertPrintable(pageIds);
   const cardIds = views.flatMap((v) => v.items.map((i) => i.card.id));
   const rows = cardIds.length
-    ? await db.select({ id: cards.id, localPath: cards.localPath, mimeType: cards.mimeType, cropBox: cards.cropBox }).from(cards).where(inArray(cards.id, cardIds))
+    ? await db
+        .select({ id: cards.id, mimeType: cards.mimeType, cropBox: cards.cropBox, cloudinaryUrl: cards.cloudinaryUrl })
+        .from(cards)
+        .where(inArray(cards.id, cardIds))
     : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
 
@@ -25,8 +28,8 @@ export async function buildPagesPdf(pageIds: string[]) {
     const slots = [];
     for (const item of v.items) {
       const info = byId.get(item.card.id);
-      const bytes = info ? await readStoredFile(info.localPath) : null;
-      if (!info || !bytes) throw new UserError(`The file for ${item.card.fullName} is missing on this laptop`);
+      const bytes = info?.cloudinaryUrl ? await fetchCardBytes(info.cloudinaryUrl) : null;
+      if (!info || !bytes) throw new UserError(`The file for ${item.card.fullName} couldn't be fetched from cloud storage`);
       slots.push({ slot: item.slot, bytes: new Uint8Array(bytes), mime: info.mimeType, cropBox: info.cropBox ?? undefined });
     }
     sheets.push({ slots, label: `${v.jobKind === "REPRINT" ? "Reprint " : ""}page ${v.pageNumber}` });

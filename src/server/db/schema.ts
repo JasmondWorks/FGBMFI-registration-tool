@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   bigserial,
   boolean,
+  customType,
   doublePrecision,
   index,
   integer,
@@ -13,6 +14,10 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Buffer }>({
+  dataType: () => "bytea",
+});
 
 /* ------------------------------------------------------------------ */
 /* Enums                                                               */
@@ -60,7 +65,9 @@ export const cards = pgTable(
     fileHash: text("file_hash").notNull(),
     mimeType: text("mime_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
-    localPath: text("local_path").notNull(),
+    // Null for cards saved straight to the cloud (the normal path now) — local disk is
+    // only ever a same-request convenience, never something later requests can rely on.
+    localPath: text("local_path"),
     pageWidthPt: integer("page_width_pt"),
     pageHeightPt: integer("page_height_pt"),
 
@@ -178,6 +185,21 @@ export const auditEvents = pgTable(
   },
   (t) => [index("audit_card_idx").on(t.cardId), index("audit_page_idx").on(t.pageId), index("audit_created_idx").on(t.createdAt)],
 );
+
+/**
+ * A file between "analyzed" and "accepted into a card" (the duplicate-review step in
+ * between can take a while, and happens as a separate request from the one that analyzed
+ * it, so it can't just live in memory). Short-lived: cleaned up well after the 24h TTL
+ * used to expire an unreviewed upload.
+ */
+export const stagingFiles = pgTable("staging_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  bytes: bytea("bytes").notNull(),
+  mime: text("mime").notNull(),
+  ext: text("ext").notNull(),
+  meta: jsonb("meta").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
