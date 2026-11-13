@@ -58,6 +58,10 @@ export type CardSummary = {
   mimeType: string;
   extraFields: Record<string, string>;
   cloudStatus: "PENDING" | "SYNCED" | "FAILED" | "DISABLED";
+  badgeFormat: "OVERLAY" | "FULL_CARD";
+  cropBox: { x: number; y: number; width: number; height: number } | null;
+  pageWidthPt: number | null;
+  pageHeightPt: number | null;
 };
 
 export type DuplicateMatch = {

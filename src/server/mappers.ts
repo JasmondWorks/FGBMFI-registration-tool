@@ -26,5 +26,9 @@ export function toCardSummary(c: Card): CardSummary {
     mimeType: c.mimeType,
     extraFields: c.extraFields,
     cloudStatus: c.cloudStatus,
+    badgeFormat: c.badgeFormat,
+    cropBox: c.cropBox ?? null,
+    pageWidthPt: c.pageWidthPt,
+    pageHeightPt: c.pageHeightPt,
   };
 }

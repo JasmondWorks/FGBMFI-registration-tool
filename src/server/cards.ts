@@ -293,6 +293,25 @@ export async function deleteCard(id: string, operator: string) {
   return toCardSummary(updated);
 }
 
+/**
+ * Manually sets the crop region for a FULL_CARD-format badge (one with the whole card's
+ * artwork baked in, not just a name overlay) — there's no automatic way to know where the
+ * dynamic part sits on an unfamiliar template, so the operator draws it once. Box is in
+ * PDF points, bottom-left origin, matching what sheet-pdf.ts expects at print time.
+ */
+export async function setCardCropBox(id: string, cropBox: { x: number; y: number; width: number; height: number }, operator: string) {
+  const card = await db.query.cards.findFirst({ where: eq(cards.id, id) });
+  if (!card) throw new UserError("Badge not found", 404);
+  const reviewReasons = card.reviewReasons.filter((r) => !r.startsWith("This file has a background image baked in"));
+  const [updated] = await db
+    .update(cards)
+    .set({ cropBox, reviewReasons, needsReview: reviewReasons.length > 0, updatedAt: new Date() })
+    .where(eq(cards.id, id))
+    .returning();
+  await logEvent({ type: "FIELD_EDITED", actor: operator, cardId: id, payload: { changes: { cropBox: { from: card.cropBox, to: cropBox } } } });
+  return toCardSummary(updated);
+}
+
 /** Log that someone opened a badge, at most once per operator per 10 minutes. */
 export async function logViewed(cardId: string, operator: string) {
   const recent = await db

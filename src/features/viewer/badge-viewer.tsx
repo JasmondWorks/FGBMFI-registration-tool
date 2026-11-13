@@ -27,6 +27,7 @@ import type { AuditEntry, CardDetail } from "@/lib/types";
 import { BadgeImage, cardFileUrl } from "@/features/pdf/pdf-render";
 import { useOverlay } from "@/features/overlays/use-overlay";
 import { SlotEditor } from "@/features/preview/slot-editor";
+import { CropEditor } from "@/features/badges/crop-editor";
 import { SheetView } from "@/features/preview/sheet-view";
 import { addToReprintDraft, getReprintDraft, setReprintDraft } from "@/features/reprint/reprint-draft";
 
@@ -196,6 +197,15 @@ export function BadgeViewer() {
                   <h3 className="mb-3 text-sm font-medium">Correct the recorded details</h3>
                   <SlotEditor card={card} onSaved={reload} />
                 </div>
+                {card.badgeFormat === "FULL_CARD" && (
+                  <div className="rounded-md border border-warning/40 bg-warning-soft/40 p-4">
+                    <h3 className="mb-1 text-sm font-medium">Crop the dynamic area</h3>
+                    <p className="mb-3 text-xs text-muted-foreground">
+                      This file has the whole card baked in, not just a name overlay — pick the region that should actually print.
+                    </p>
+                    <CropEditor card={card} onSaved={reload} />
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="history">
