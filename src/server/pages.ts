@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { CARDS_PER_PAGE, checkCount, chunkIntoPages } from "@/lib/paging";
 import type { JobView, PageView } from "@/lib/types";
 import { logEvents, type AuditInput } from "./audit";
+import { enqueueDelete, triggerDeleteQueue } from "./cloudinary";
 import { db, type Tx } from "./db";
 import { cards, jobs, pageItems, pages, type Card } from "./db/schema";
 import { UserError } from "./http";
@@ -422,6 +423,44 @@ export async function cancelSent(pageIds: string[], operator: string) {
       .where(and(inArray(cards.id, items.map((i) => i.cardId)), eq(cards.status, "PRINT_SENT")));
     await logEvents(pageIds.map((pageId) => ({ type: "PRINT_CANCELLED" as const, actor: operator, pageId })), tx);
   });
+}
+
+/**
+ * Throws away a whole sheet that never should have gone to print — a test batch, or
+ * something built by mistake. Only ever for a READY page (never sent): once it's been
+ * sent, "nothing printed" / confirm-as-failed already cover undoing it, and discarding
+ * printed badges is a different, far more consequential action than this one is for.
+ * Unlike removing a single badge from a sheet (which goes back to the queue to print
+ * later), the whole point here is that these badges are NOT meant to print again —
+ * discarded outright, same as deleting them one by one.
+ */
+export async function discardPage(pageId: string, operator: string) {
+  const page = await db.query.pages.findFirst({ where: eq(pages.id, pageId) });
+  if (!page) throw new UserError("That sheet no longer exists", 404);
+  if (page.status !== "READY") throw new UserError("Only a sheet that hasn't been sent to print can be discarded this way");
+
+  let discardedRows: Card[] = [];
+  await db.transaction(async (tx) => {
+    const items = await tx.select().from(pageItems).where(eq(pageItems.pageId, pageId));
+    const cardIds = items.map((i) => i.cardId);
+    if (cardIds.length) {
+      discardedRows = await tx.query.cards.findMany({ where: inArray(cards.id, cardIds) });
+      await tx.update(cards).set({ status: "DISCARDED", updatedAt: new Date() }).where(inArray(cards.id, cardIds));
+      await logEvents(
+        discardedRows.map((c) => ({ type: "DISCARDED" as const, actor: operator, cardId: c.id, pageId, payload: { fullName: c.fullName, reason: "Sheet discarded before printing" } })),
+        tx,
+      );
+    }
+    await tx.delete(pages).where(eq(pages.id, pageId));
+  });
+
+  // Queued, not inline — same as the single-badge delete path, a Cloudinary round trip
+  // shouldn't make discarding a sheet wait, and a failure here shouldn't undo it.
+  const publicIds = discardedRows.map((c) => c.cloudinaryPublicId).filter((id): id is string => !!id);
+  if (publicIds.length) {
+    await Promise.all(publicIds.map((id) => enqueueDelete(id)));
+    triggerDeleteQueue();
+  }
 }
 
 /* ------------------------------------------------------------------ */

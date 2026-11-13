@@ -41,8 +41,10 @@ export function UnconfirmedIndicator() {
       )}
       title="Sheets sent to the printer that nobody's confirmed yet"
     >
-      <span className="tnum">{count}</span>
-      <span className="hidden sm:inline">{pluralize(count, "sheet")} to confirm</span>
+      {/* Below sm there's only room for the bare number; at sm+ pluralize() already
+          includes it ("3 sheets"), so showing both would just repeat the count twice. */}
+      <span className="tnum sm:hidden">{count}</span>
+      <span className="tnum hidden sm:inline">{pluralize(count, "sheet")} to confirm</span>
     </button>
   );
 }

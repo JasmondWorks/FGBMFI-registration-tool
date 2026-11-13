@@ -3,6 +3,16 @@
 import * as React from "react";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -40,8 +50,26 @@ export function JobPreview() {
   const [showTemplate, setShowTemplate] = React.useState(true);
   const [assignTarget, setAssignTarget] = React.useState<SlotTarget | null>(null);
   const [fixDismissedFor, setFixDismissedFor] = React.useState<string | null>(null);
+  const [discarding, setDiscarding] = React.useState<PageView | null>(null);
+  const [discardBusy, setDiscardBusy] = React.useState(false);
   const { printPages, phase, settings, openConfirm } = usePrint();
   const intake = useIntakeContext();
+
+  async function discardSheet(page: PageView) {
+    setDiscardBusy(true);
+    try {
+      await api(`/api/pages/${page.id}/discard`, { method: "POST" });
+      emitDeskChanged();
+      toast.success(`Sheet ${page.pageNumber} discarded`);
+      setDiscarding(null);
+      setSelectedId(null);
+      await reload();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setDiscardBusy(false);
+    }
+  }
 
   // A different job: start from its first sheet.
   const [shownJobId, setShownJobId] = React.useState(jobId);
@@ -285,13 +313,23 @@ export function JobPreview() {
                           : "In the print dialog choose A4 and Actual size (100%). Never Fit to page."}
                     </p>
                     {selected.status === "READY" && selected.items.length !== 4 && !selected.isUnderfilled ? (
-                      <Button variant="outline" onClick={() => setFix({ base: {} })}>
-                        Fix this sheet to print it
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDiscarding(selected)}>
+                          Discard this sheet
+                        </Button>
+                        <Button variant="outline" onClick={() => setFix({ base: {} })}>
+                          Fix this sheet to print it
+                        </Button>
+                      </div>
                     ) : selected.status === "READY" ? (
-                      <Button variant="outline" onClick={() => printPages([selected.id])} disabled={printing}>
-                        Print this sheet
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDiscarding(selected)}>
+                          Discard this sheet
+                        </Button>
+                        <Button variant="outline" onClick={() => printPages([selected.id])} disabled={printing}>
+                          Print this sheet
+                        </Button>
+                      </div>
                     ) : selected.status === "SENT" || selected.status === "SPOOLED" ? (
                       <Button variant="outline" onClick={() => openConfirm([selected.id])}>
                         Confirm this sheet
@@ -431,6 +469,25 @@ export function JobPreview() {
             void reload();
           }}
         />
+
+        <AlertDialog open={!!discarding} onOpenChange={(o) => !o && !discardBusy && setDiscarding(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Discard sheet {discarding?.pageNumber}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {discarding && pluralize(discarding.items.length, "badge")} on this sheet{" "}
+                {discarding?.items.map((i) => i.card.fullName).join(", ")} will be discarded, not just removed from the
+                sheet — use this for test data or a sheet built by mistake. This can&apos;t be undone from here.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={discardBusy}>Go back</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" disabled={discardBusy} onClick={() => discarding && discardSheet(discarding)}>
+                {discardBusy ? "Discarding..." : "Discard the sheet"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );
