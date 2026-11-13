@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { createStoredStore } from "@/lib/stored-store";
 import { useIsMobile } from "@/lib/use-is-mobile";
@@ -28,15 +28,20 @@ const TourContext = React.createContext<{
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isMobile = useIsMobile();
   const steps = React.useMemo(() => getTourSteps(isMobile), [isMobile]);
   const [state, setState] = React.useState<TourState>({ active: false, step: 0 });
   const [seen] = seenStore.useValue();
 
   const begin = React.useCallback(() => {
-    if (pathname !== "/") router.push("/");
+    // Not just a different pathname — a query-param overlay (job preview, badge viewer,
+    // reprint) can be open on this exact same "/" route. Leaving it open underneath meant
+    // a real Radix dialog was fighting the tour for every click, with nothing responding.
+    // Always land on a genuinely clean "/" regardless of what's currently open.
+    if (pathname !== "/" || searchParams.size > 0) router.push("/");
     setState({ active: true, step: 0 });
-  }, [pathname, router]);
+  }, [pathname, searchParams, router]);
 
   // This has to be an effect, not a render-time check: useSyncExternalStore returns the
   // SSR-safe placeholder (false) during hydration, and the real localStorage value only

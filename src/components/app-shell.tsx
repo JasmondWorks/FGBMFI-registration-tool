@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Toaster, TooltipProvider } from "@/components/ui/misc";
 import { MenuIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { ModeFromUrl } from "@/lib/mode-from-url";
 import { queryClient } from "@/lib/query-client";
 import { useMode, type DeskMode } from "@/lib/use-mode";
 import { IntakeProvider } from "@/features/intake/intake-provider";
@@ -48,6 +49,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <TooltipProvider>
           <PrintProvider>
             <React.Suspense>
+              <ModeFromUrl />
               <IntakeProvider>
                 <TourProvider>
                   <div className="flex min-h-dvh flex-col">
