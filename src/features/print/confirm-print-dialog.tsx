@@ -106,7 +106,16 @@ export function ConfirmPrintDialog({ pageIds, onClose }: { pageIds: string[] | n
 
   return (
     <Dialog open={!!pageIds} onOpenChange={(o) => !o && !busy && onClose()}>
-      <DialogContent className="flex max-h-[min(760px,calc(100dvh-2rem))] flex-col gap-0 p-0 sm:max-w-2xl" showCloseButton={!busy}>
+      <DialogContent
+        className="flex max-h-[min(760px,calc(100dvh-2rem))] flex-col gap-0 p-0 sm:max-w-2xl"
+        showCloseButton={!busy}
+        // A misclick outside (or a stray Escape) shouldn't lose this — printing is the
+        // priority, and recovering the "reprint the failed ones" action after an
+        // accidental dismiss was the actual problem reported. Only the explicit close
+        // button (or Save/Nothing printed) can dismiss it now.
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader className="border-b px-6 py-5">
           <DialogTitle>Did these print correctly?</DialogTitle>
           <DialogDescription>
