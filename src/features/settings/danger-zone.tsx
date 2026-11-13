@@ -9,28 +9,29 @@ import { Label } from "@/components/ui/label";
 import { api, errorMessage } from "@/lib/api";
 import { emitDeskChanged } from "@/lib/events";
 import { useOperator } from "@/features/operator/operator-context";
+import { useSettingsPin } from "./settings-gate";
 
 const PHRASE = "DELETE EVERYTHING";
 
 /** Wipes all test data: every badge, page, job and audit event, gone for good. */
 export function DangerZone() {
   const { requireOperator } = useOperator();
+  const pin = useSettingsPin();
   const [text, setText] = React.useState("");
-  const [pin, setPin] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [open, setOpen] = React.useState(false);
 
-  const canSubmit = text === PHRASE && pin.length > 0;
+  const canSubmit = text === PHRASE;
 
   async function reset() {
     if (!requireOperator() || !canSubmit) return;
     setBusy(true);
     try {
+      // The PIN that unlocked this whole page also authorizes this — no need to ask twice.
       await api("/api/admin/reset", { method: "POST", json: { confirm: text, pin } });
       emitDeskChanged();
       toast.success("Everything's cleared. Starting fresh.");
       setText("");
-      setPin("");
       setOpen(false);
     } catch (err) {
       toast.error(errorMessage(err));
@@ -45,7 +46,7 @@ export function DangerZone() {
         <h2 className="text-base font-semibold text-destructive">Danger zone</h2>
         <p className="max-w-2xl text-sm text-muted-foreground">
           Clears every badge, sheet, upload and audit record on this desk. Use this to wipe out test data before the real event —
-          never once real badges are being tracked. This can't be undone.
+          never once real badges are being tracked. This can&apos;t be undone.
         </p>
       </div>
       {!open ? (
@@ -60,23 +61,11 @@ export function DangerZone() {
             </Label>
             <Input id="reset-confirm" value={text} onChange={(e) => setText(e.target.value)} autoComplete="off" className="max-w-sm" />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="reset-pin">Reset PIN</Label>
-            <Input
-              id="reset-pin"
-              type="password"
-              inputMode="numeric"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              autoComplete="off"
-              className="max-w-sm"
-            />
-          </div>
           <div className="flex gap-2">
             <Button variant="destructive" disabled={!canSubmit || busy} onClick={reset}>
               {busy ? "Clearing..." : "Clear everything"}
             </Button>
-            <Button variant="ghost" onClick={() => (setOpen(false), setText(""), setPin(""))}>
+            <Button variant="ghost" onClick={() => (setOpen(false), setText(""))}>
               Cancel
             </Button>
           </div>
